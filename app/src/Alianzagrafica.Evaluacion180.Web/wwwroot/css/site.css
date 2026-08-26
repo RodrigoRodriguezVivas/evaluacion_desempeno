@@ -19,6 +19,16 @@ body {
     background-color: var(--azul-marca);
 }
 
+.navbar-logo {
+    height: 32px;
+    width: auto;
+}
+
+.logo-sin-sesion {
+    height: 72px;
+    width: auto;
+}
+
 .app-container {
     flex: 1 0 auto;
 }
