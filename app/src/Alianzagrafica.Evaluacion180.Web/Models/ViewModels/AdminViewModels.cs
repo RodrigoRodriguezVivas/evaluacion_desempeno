@@ -72,6 +72,11 @@ public class EmpleadoListaItemViewModel
     public string TipoPersonal { get; set; } = string.Empty;
     public string? JefeDirecto { get; set; }
     public string Estado { get; set; } = string.Empty;
+
+    // Único dato editable desde este sistema (RF-23): número de WhatsApp para el envío del
+    // resumen de resultados. Se guarda en ContactoNotificacion, no en Empleado — ver
+    // EmpleadosController.ActualizarContacto.
+    public string? TelefonoWhatsApp { get; set; }
 }
 
 public class AuditoriaItemViewModel

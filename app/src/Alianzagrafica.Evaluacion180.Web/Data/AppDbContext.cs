@@ -27,6 +27,8 @@ public class AppDbContext : DbContext
     public DbSet<RespuestaDetalle> RespuestaDetalles { get; set; } = null!;
     public DbSet<ResultadoConsolidado> ResultadosConsolidados { get; set; } = null!;
     public DbSet<Auditoria> Auditorias { get; set; } = null!;
+    public DbSet<ContactoNotificacion> ContactosNotificacion { get; set; } = null!;
+    public DbSet<EnvioResultadoToken> EnviosResultadoToken { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -275,6 +277,29 @@ public class AppDbContext : DbContext
                 .WithMany()
                 .HasForeignKey(x => x.IdUsuario)
                 .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---- ContactoNotificacion (módulo de envío de resultados — ver Models/Entidades/ContactoNotificacion.cs
+        // sobre por qué vive separada de Empleado) ----
+        modelBuilder.Entity<ContactoNotificacion>(e =>
+        {
+            e.ToTable("ContactoNotificacion");
+            e.HasKey(x => x.CodigoEmpleado);
+            e.Property(x => x.CodigoEmpleado).ValueGeneratedNever();
+            e.Property(x => x.TelefonoWhatsApp).HasMaxLength(30);
+
+            e.HasOne(x => x.Empleado)
+                .WithOne()
+                .HasForeignKey<ContactoNotificacion>(x => x.CodigoEmpleado)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---- EnvioResultadoToken (módulo de envío de resultados — ver Models/Entidades/EnvioResultadoToken.cs) ----
+        modelBuilder.Entity<EnvioResultadoToken>(e =>
+        {
+            e.ToTable("EnvioResultadoToken");
+            e.HasKey(x => x.Token);
+            e.Property(x => x.Token).HasMaxLength(32);
         });
     }
 }

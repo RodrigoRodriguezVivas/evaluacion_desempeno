@@ -55,6 +55,24 @@ public static class DemoSeed
         db.Empleados.AddRange(gerente, jefeProduccion, jefeAdmin, analistaNomina, operarioOffset, operarioTroquelado, auxiliarBodega, auxiliarAdmin, conductorDespachos);
         await db.SaveChangesAsync();
 
+        // ---- Contacto de WhatsApp (RF-23) — números ficticios, uno por empleado demo, para
+        // poder probar el envío del resumen de resultados sin depender de Novasoft (ver
+        // ContactoNotificacion.cs: tabla local, separada del dato maestro de Empleado). Se
+        // sigue el mismo criterio de datos de ejemplo claramente ficticios usado en el resto
+        // de esta siembra (correos @alianzagrafica-demo.com).
+        var ahoraContacto = ahora;
+        db.ContactosNotificacion.AddRange(
+            new ContactoNotificacion { CodigoEmpleado = gerente.CodigoEmpleado, TelefonoWhatsApp = "3000000201", FechaActualizacion = ahoraContacto },
+            new ContactoNotificacion { CodigoEmpleado = jefeProduccion.CodigoEmpleado, TelefonoWhatsApp = "3000000202", FechaActualizacion = ahoraContacto },
+            new ContactoNotificacion { CodigoEmpleado = jefeAdmin.CodigoEmpleado, TelefonoWhatsApp = "3000000203", FechaActualizacion = ahoraContacto },
+            new ContactoNotificacion { CodigoEmpleado = analistaNomina.CodigoEmpleado, TelefonoWhatsApp = "3000000204", FechaActualizacion = ahoraContacto },
+            new ContactoNotificacion { CodigoEmpleado = operarioOffset.CodigoEmpleado, TelefonoWhatsApp = "3000000205", FechaActualizacion = ahoraContacto },
+            new ContactoNotificacion { CodigoEmpleado = operarioTroquelado.CodigoEmpleado, TelefonoWhatsApp = "3000000206", FechaActualizacion = ahoraContacto },
+            new ContactoNotificacion { CodigoEmpleado = auxiliarBodega.CodigoEmpleado, TelefonoWhatsApp = "3000000207", FechaActualizacion = ahoraContacto },
+            new ContactoNotificacion { CodigoEmpleado = auxiliarAdmin.CodigoEmpleado, TelefonoWhatsApp = "3000000208", FechaActualizacion = ahoraContacto },
+            new ContactoNotificacion { CodigoEmpleado = conductorDespachos.CodigoEmpleado, TelefonoWhatsApp = "3000000209", FechaActualizacion = ahoraContacto });
+        await db.SaveChangesAsync();
+
         // ---- Roles ----
         var rolAdminSistema = new Rol { NombreRol = Constantes.RolAdministradorSistema };
         var rolAdminGH = new Rol { NombreRol = Constantes.RolAdministradorGestionHumana };

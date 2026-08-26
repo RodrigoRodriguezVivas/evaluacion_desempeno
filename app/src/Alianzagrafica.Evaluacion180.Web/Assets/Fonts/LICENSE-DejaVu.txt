@@ -1,0 +1,8 @@
+DejaVu Sans / DejaVu Sans Bold — usadas para dibujar la imagen-resumen de resultados
+(Services/ResumenImagenService.cs), incluidas aquí como archivo para que el renderizado sea
+idéntico en el contenedor Docker (Linux/Render) y en el IIS de Alianzagrafica (Windows), sin
+depender de qué fuentes tenga instaladas cada sistema operativo.
+
+Basadas en Bitstream Vera Fonts, con cambios en dominio público de los autores de DejaVu.
+Licencia: Bitstream Vera License (permite uso, copia, modificación y redistribución, incluso
+embebida en software, sin regalías). Texto completo y fuente oficial: https://dejavu-fonts.github.io/

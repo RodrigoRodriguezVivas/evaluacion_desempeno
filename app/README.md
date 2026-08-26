@@ -190,7 +190,123 @@ activar el envío real, configurar (por variable de entorno o
 }
 ```
 
-## 8. Transparencia sobre cómo se verificó esta aplicación
+## 8. Envío de resultados por correo y WhatsApp (RF-23)
+
+Desde **Reportes** (sección de resultados consolidados), el personal de
+Gestión Humana o de Sistemas puede pulsar "Enviar resultado" junto a un
+colaborador para que el sistema le envíe su resultado consolidado por dos
+canales, de forma independiente:
+
+- **Correo electrónico**: un mensaje HTML con el promedio general y un enlace
+  a "Mis resultados", con la imagen-resumen adjunta en PNG. Usa la misma
+  configuración `Smtp` de la sección 7.
+- **WhatsApp**: la misma imagen-resumen, enviada como mensaje de WhatsApp
+  Business a través de la API de Twilio. Solo se envía si el colaborador
+  tiene un número de WhatsApp registrado (ver más abajo); si no lo tiene, el
+  sistema lo informa en pantalla y de todas formas envía el correo.
+
+Ambos envíos quedan registrados en el módulo de auditoría (`EnvioResultadoCorreo`,
+`EnvioResultadoWhatsApp`), igual que el resto de acciones del sistema.
+
+### 8.1 Número de WhatsApp del colaborador
+
+El número de WhatsApp **no** viene de Novasoft ni se guarda en la tabla
+`Empleado` — este sistema nunca edita datos maestros de empleados (sección 5).
+Se guarda en una tabla local nueva, `ContactoNotificacion`, editable desde
+**Empleados** (columna "WhatsApp", con guardado en línea). Esto significa que
+el número sobrevive a cada resincronización desde Novasoft sin tocar el dato
+maestro.
+
+### 8.2 Configuración de WhatsApp (Twilio)
+
+La sección `WhatsApp` de `appsettings.json` tiene `ModoSimulado: true` por
+defecto: mientras esté así, los mensajes de WhatsApp no se envían de verdad,
+solo quedan registrados en el log de la aplicación (igual que el `ModoSimulado`
+de SMTP). Para activar el envío real hace falta una cuenta de **WhatsApp
+Business API** — este proyecto usa **Twilio** como proveedor (vía su API REST
+directa, sin el SDK de Twilio, para no sumar dependencias NuGet nuevas más
+allá de las de generación de imágenes — ver 8.4):
+
+```json
+{
+  "WhatsApp": {
+    "ModoSimulado": false,
+    "Proveedor": "Twilio",
+    "AccountSid": "ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "AuthToken": "CAMBIAR_EN_PRODUCCION",
+    "NumeroRemitente": "+14155238886",
+    "IndicativoPaisPorDefecto": "57"
+  }
+}
+```
+
+`NumeroRemitente` es el número de WhatsApp Business aprobado en la cuenta de
+Twilio (en modo sandbox de pruebas, Twilio asigna uno propio). Antes de poner
+`ModoSimulado` en `false` en producción, Alianzagrafica debe tener una cuenta
+de Twilio (o, como alternativa futura, la API de Meta directamente —
+`IWhatsAppService` está diseñado para admitir otro proveedor sin tocar el
+resto del sistema) con el número de envío ya aprobado por Meta para WhatsApp
+Business, y aceptar las políticas de plantillas de mensajes de WhatsApp que
+apliquen según el volumen de envío.
+
+### 8.3 Cómo llega la imagen a WhatsApp
+
+A diferencia del correo (donde la imagen va adjunta directamente), la API de
+WhatsApp de Twilio descarga la imagen desde una URL pública en vez de recibir
+el archivo binario. Por eso, al enviar por WhatsApp el sistema:
+
+1. Genera la imagen-resumen una sola vez (una "fotografía" fija del resultado
+   en ese momento).
+2. La guarda temporalmente en la base de datos junto con un token aleatorio.
+3. Construye un enlace público `.../Resultados/ImagenResumen/{token}` (usa
+   `Smtp:UrlBase`, que por eso debe ser la URL real y accesible desde
+   internet de la aplicación, nunca `localhost`).
+4. Le pasa ese enlace a Twilio, que lo descarga y lo entrega dentro del
+   mensaje de WhatsApp.
+
+El enlace es de un solo uso conceptual y expira a los 30 minutos — vencido
+ese plazo, el sistema responde "no encontrado" a cualquier solicitud con ese
+token. **Pendiente de mejora**, documentado también en el código: no existe
+todavía una tarea programada que borre filas ya expiradas de la tabla
+`EnvioResultadoToken`; hoy simplemente dejan de ser accesibles, pero siguen
+ocupando espacio hasta que alguien las purgue manualmente o se agregue esa
+tarea.
+
+### 8.4 Generación de la imagen-resumen
+
+La imagen-resumen (nombre, cargo, promedio general con su banda de
+calificación según el formato GHU-FOR-007, y el detalle por competencia) se
+genera con **SixLabors.ImageSharp** y **SixLabors.ImageSharp.Drawing** —
+librerías 100% administradas (no dependen de GDI+ ni de `libgdiplus`), a
+propósito para que la imagen se vea igual tanto en el contenedor Docker Linux
+del ambiente de demostración como en el IIS de Alianzagrafica sobre Windows.
+El texto se dibuja con la fuente DejaVu Sans, incluida dentro del proyecto
+(`Assets/Fonts/`, licencia Bitstream Vera — ver
+`Assets/Fonts/LICENSE-DejaVu.txt`) para que el resultado no dependa de qué
+fuentes tenga instaladas el servidor.
+
+**Importante — este código no se pudo compilar ni ejecutar en este entorno de
+desarrollo**, por la misma falta de acceso a `nuget.org` descrita en la
+sección 9: los paquetes `SixLabors.ImageSharp`/`SixLabors.ImageSharp.Drawing`
+son nuevos en este proyecto y no había forma de descargarlos aquí para
+probarlos. Se escribió el código con cuidado contra la superficie de API
+estable y conocida de esas librerías, pero **el primer
+`dotnet restore && dotnet build` en un equipo con acceso normal a internet
+debe usarse para confirmar que compila**, y conviene hacer al menos un envío
+de prueba de extremo a extremo (con `ModoSimulado: true` en ambos canales
+primero, revisando el log, y luego con un número/correo real de prueba)
+antes de dar por buena esta funcionalidad en producción.
+
+Lo que sí se pudo verificar sin depender de NuGet, por tratarse de lógica
+pura sin dependencias externas, fueron las reglas de normalización del
+número de WhatsApp (`WhatsAppNotificacionService.NormalizarNumero`) y de
+clasificación de la banda de calificación (`ResumenImagenService.Banda`,
+GHU-FOR-007: 1–2 ≈ Deficiente, 3 ≈ Aceptable, 4 ≈ Bueno, 5 ≈ Sobresaliente,
+sobre la escala continua de promedios), ejecutando esa lógica de forma
+aislada en un proyecto de consola sin ninguna referencia a paquete NuGet.
+Las 13 pruebas ejecutadas pasaron correctamente.
+
+## 9. Transparencia sobre cómo se verificó esta aplicación
 
 Este proyecto se desarrolló en un entorno de trabajo sin salida de red hacia
 `nuget.org` ni una instancia real de SQL Server disponible. Para poder
@@ -213,9 +329,11 @@ En consecuencia, se recomienda que el primer `dotnet restore && dotnet build`
 en un equipo con acceso normal a internet (sección 3) sea el paso de
 verificación final antes de publicar a producción, ya que este entorno no
 pudo confirmar la compilación contra los paquetes NuGet reales ni una
-conexión a SQL Server real.
+conexión a SQL Server real. Esto aplica en particular al módulo de envío de
+resultados por correo y WhatsApp descrito en la sección 8, que agrega los
+únicos paquetes NuGet nuevos de todo el proyecto.
 
-## 9. Credenciales de prueba (solo con `ModoPruebasLocal: true`)
+## 10. Credenciales de prueba (solo con `ModoPruebasLocal: true`)
 
 Con el script `sql/01_esquema_y_datos_ficticios.sql` ya ejecutado y el modo de
 pruebas activo (nunca en producción — ver sección 6), cualquier usuario

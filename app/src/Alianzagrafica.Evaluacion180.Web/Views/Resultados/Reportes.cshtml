@@ -1,6 +1,9 @@
 @model ReportesViewModel
 @{
     ViewData["Title"] = "Reportes";
+    // El envío de resultados (RF-23) está restringido a GH/Sistema — Consulta Directiva puede
+    // ver este reporte pero no dispara envíos.
+    var puedeEnviarResultado = User.IsInRole(Constantes.RolAdministradorGestionHumana) || User.IsInRole(Constantes.RolAdministradorSistema);
 }
 
 <h1 class="h3 mt-4 mb-1">Reportes — @(Model.PeriodoNombre ?? "sin periodo")</h1>
@@ -54,6 +57,10 @@ else
                     <th>Tipo de personal</th>
                     <th>Área</th>
                     <th>Promedio general</th>
+                    @if (puedeEnviarResultado)
+                    {
+                        <th>Acciones</th>
+                    }
                 </tr>
             </thead>
             <tbody>
@@ -66,11 +73,24 @@ else
                         <td>@r.TipoPersonal</td>
                         <td>@r.Area</td>
                         <td><strong>@(r.PromedioGeneral?.ToString("0.00") ?? "—")</strong></td>
+                        @if (puedeEnviarResultado)
+                        {
+                            <td>
+                                <form method="post" asp-action="EnviarResultado" asp-controller="Resultados" class="d-inline">
+                                    @Html.AntiForgeryToken()
+                                    <input type="hidden" name="codigoEvaluado" value="@r.CodigoEmpleado" />
+                                    <input type="hidden" name="idPeriodo" value="@Model.IdPeriodo" />
+                                    <button type="submit" class="btn btn-sm btn-outline-primary" title="Enviar resultado por correo y WhatsApp">
+                                        Enviar resultado
+                                    </button>
+                                </form>
+                            </td>
+                        }
                     </tr>
                 }
                 @if (Model.Resultados.Count == 0)
                 {
-                    <tr><td colspan="5" class="text-muted text-center py-3">Todavía no hay resultados consolidados para este periodo.</td></tr>
+                    <tr><td colspan="@(puedeEnviarResultado ? 6 : 5)" class="text-muted text-center py-3">Todavía no hay resultados consolidados para este periodo.</td></tr>
                 }
             </tbody>
         </table>

@@ -27,6 +27,7 @@ public class ReporteAreaViewModel
 
 public class ResultadoEmpleadoViewModel
 {
+    public int CodigoEmpleado { get; set; }
     public string NombreEmpleado { get; set; } = string.Empty;
     public string Cargo { get; set; } = string.Empty;
     public string TipoPersonal { get; set; } = string.Empty;
@@ -36,6 +37,7 @@ public class ResultadoEmpleadoViewModel
 
 public class ReportesViewModel
 {
+    public int? IdPeriodo { get; set; }
     public string? PeriodoNombre { get; set; }
     public List<ReporteAreaViewModel> AvancePorArea { get; set; } = new();
     public List<ResultadoEmpleadoViewModel> Resultados { get; set; } = new();

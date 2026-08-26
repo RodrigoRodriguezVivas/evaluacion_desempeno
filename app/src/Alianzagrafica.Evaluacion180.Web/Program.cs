@@ -11,6 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 // ---- Configuración ----
 builder.Services.Configure<SmtpOptions>(builder.Configuration.GetSection("Smtp"));
 builder.Services.Configure<AuthOptions>(builder.Configuration.GetSection("Auth"));
+builder.Services.Configure<WhatsAppOptions>(builder.Configuration.GetSection("WhatsApp"));
 
 // ---- Base de datos ----
 // Database:Provider = "SqlServer" (valor por defecto, usado en el despliegue real en el IIS
@@ -35,6 +36,11 @@ builder.Services.AddScoped<IAuditoriaService, AuditoriaService>();
 builder.Services.AddScoped<IAsignacionService, AsignacionService>();
 builder.Services.AddScoped<IResultadoService, ResultadoService>();
 builder.Services.AddScoped<INotificacionService, SmtpNotificacionService>();
+
+// Módulo de envío de resultados (correo + WhatsApp) — ver Services/EnvioResultadoService.cs.
+builder.Services.AddScoped<IResumenImagenService, ResumenImagenService>();
+builder.Services.AddHttpClient<IWhatsAppService, WhatsAppNotificacionService>();
+builder.Services.AddScoped<IEnvioResultadoService, EnvioResultadoService>();
 
 // ---- Autenticación por cookie ----
 // En producción, cuando IIS tenga habilitada la Autenticación de Windows para el

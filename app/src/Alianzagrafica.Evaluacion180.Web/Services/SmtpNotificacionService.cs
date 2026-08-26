@@ -75,12 +75,47 @@ public class SmtpNotificacionService : INotificacionService
         return await NotificarAsignacionesAsync(pendientes);
     }
 
-    private async Task EnviarAsync(string destinatario, string asunto, string cuerpo)
+    // RF-23 — módulo de envío de resultados por correo (y, por separado, por WhatsApp — ver
+    // IWhatsAppService/EnvioResultadoService). Aquí solo va el correo: la imagen-resumen ya
+    // generada (ResumenImagenService) se adjunta al mensaje.
+    public async Task<bool> EnviarResultadoEvaluacionAsync(Empleado empleado, ResultadoConsolidado resultado, byte[] imagenResumenPng)
+    {
+        if (string.IsNullOrWhiteSpace(empleado.CorreoElectronico))
+        {
+            _logger.LogWarning("El empleado {Codigo} no tiene correo registrado; no se pudo enviar el resultado.", empleado.CodigoEmpleado);
+            return false;
+        }
+
+        var asunto = $"Tu resultado de la Evaluación de Desempeño 180° — {resultado.Periodo?.Nombre ?? "periodo actual"}";
+        var promedio = resultado.PromedioGeneral?.ToString("0.00") ?? "—";
+        var cuerpoHtml =
+            $"<p>Hola {System.Net.WebUtility.HtmlEncode(empleado.Nombre)},</p>" +
+            $"<p>Ya está disponible el resultado de tu Evaluación de Desempeño 180° correspondiente a " +
+            $"<strong>{System.Net.WebUtility.HtmlEncode(resultado.Periodo?.Nombre ?? string.Empty)}</strong>.</p>" +
+            $"<p>Tu promedio general fue de <strong>{promedio}</strong> (escala 1 a 5). En la imagen adjunta " +
+            $"encuentras el detalle por competencia y por tipo de evaluación (autoevaluación, evaluación del " +
+            $"jefe y, cuando aplica, evaluación ascendente).</p>" +
+            $"<p>Puedes consultar también el histórico completo de tus resultados ingresando a " +
+            $"{_opciones.UrlBase}/Resultados/Mios.</p>" +
+            $"<p style=\"color:#6c757d;font-size:12px;\">Este es un mensaje automático — por favor no lo respondas. " +
+            $"Información confidencial de uso exclusivo del colaborador.</p>";
+
+        return await EnviarAsync(empleado.CorreoElectronico!, asunto, cuerpoHtml, esHtml: true,
+            adjunto: (nombre: "resumen-evaluacion.png", contenido: imagenResumenPng, tipoMime: "image/png"));
+    }
+
+    private Task EnviarAsync(string destinatario, string asunto, string cuerpo) =>
+        EnviarAsync(destinatario, asunto, cuerpo, esHtml: false, adjunto: null);
+
+    private async Task<bool> EnviarAsync(string destinatario, string asunto, string cuerpo, bool esHtml,
+        (string nombre, byte[] contenido, string tipoMime)? adjunto)
     {
         if (_opciones.ModoSimulado || string.IsNullOrWhiteSpace(_opciones.Host))
         {
-            _logger.LogInformation("[Correo simulado] Para: {Destinatario} — Asunto: {Asunto}\n{Cuerpo}", destinatario, asunto, cuerpo);
-            return;
+            _logger.LogInformation(
+                "[Correo simulado] Para: {Destinatario} — Asunto: {Asunto} — Adjunto: {Adjunto}\n{Cuerpo}",
+                destinatario, asunto, adjunto?.nombre ?? "(ninguno)", cuerpo);
+            return true;
         }
 
         using var mensaje = new MailMessage
@@ -88,9 +123,16 @@ public class SmtpNotificacionService : INotificacionService
             From = new MailAddress(_opciones.CorreoRemitente, _opciones.NombreRemitente),
             Subject = asunto,
             Body = cuerpo,
-            IsBodyHtml = false,
+            IsBodyHtml = esHtml,
         };
         mensaje.To.Add(destinatario);
+
+        Attachment? attachment = null;
+        if (adjunto is { } a)
+        {
+            attachment = new Attachment(new MemoryStream(a.contenido), a.nombre, a.tipoMime);
+            mensaje.Attachments.Add(attachment);
+        }
 
         using var cliente = new SmtpClient(_opciones.Host, _opciones.Puerto)
         {
@@ -104,11 +146,17 @@ public class SmtpNotificacionService : INotificacionService
         try
         {
             await cliente.SendMailAsync(mensaje);
+            return true;
         }
         catch (Exception ex)
         {
             // Un fallo de correo nunca debe tumbar el flujo de negocio (ej. el envío de una evaluación).
             _logger.LogError(ex, "No se pudo enviar el correo a {Destinatario}", destinatario);
+            return false;
+        }
+        finally
+        {
+            attachment?.Dispose();
         }
     }
 }

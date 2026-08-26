@@ -18,6 +18,23 @@
          y README.md, sección "Versión demo"). El despliegue real en el IIS de Alianzagrafica siempre usa
          SQL Server (Database:Provider=SqlServer, el valor por defecto). -->
     <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+
+    <!-- Módulo de envío de resultados (RF-23, ver Services/ResumenImagenService.cs): generan la
+         imagen-resumen que se adjunta al correo y se envía por WhatsApp. 100% administradas (no
+         dependen de GDI+/libgdiplus), por eso dibujan igual en el contenedor Docker Linux de la
+         demo y en el IIS de Alianzagrafica sobre Windows. Versiones de referencia — actualizar a
+         las últimas 3.x/2.x disponibles al compilar en un entorno con acceso real a NuGet.org
+         (este proyecto no lo tuvo — ver README, sección "Módulo de envío de resultados"). -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.5" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fuentes DejaVu Sans embebidas para que ResumenImagenService dibuje texto de forma
+         idéntica sin importar el sistema operativo — ver Assets/Fonts/LICENSE-DejaVu.txt. -->
+    <Content Include="Assets\Fonts\*.ttf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

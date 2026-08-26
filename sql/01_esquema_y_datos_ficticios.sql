@@ -237,6 +237,39 @@ CREATE TABLE dbo.Auditoria (
 );
 GO
 
+-- ---- Módulo de envío de resultados por correo y WhatsApp (RF-23) ----
+-- ContactoNotificacion: número de WhatsApp del empleado para el envío del resumen de
+-- resultados. Se guarda en una tabla SEPARADA de dbo.Empleado a propósito: Empleado es un
+-- espejo de solo lectura de Novasoft (sección 3.2 del documento de diseño; el sistema de
+-- evaluación NUNCA edita datos maestros de empleados), así que este dato local sobrevive a
+-- cada resincronización desde Novasoft sin violar ese principio.
+CREATE TABLE dbo.ContactoNotificacion (
+    CodigoEmpleado      INT           NOT NULL,
+    TelefonoWhatsApp    VARCHAR(30)   NULL,
+    FechaActualizacion  DATETIME2(0)  NOT NULL,
+    CONSTRAINT PK_ContactoNotificacion PRIMARY KEY (CodigoEmpleado),
+    CONSTRAINT FK_ContactoNotificacion_Empleado FOREIGN KEY (CodigoEmpleado) REFERENCES dbo.Empleado (CodigoEmpleado)
+);
+GO
+
+-- EnvioResultadoToken: enlace público temporal de la imagen-resumen que el proveedor de
+-- WhatsApp (Twilio) descarga al enviar el mensaje. Token aleatorio de un solo uso conceptual,
+-- con vigencia corta (ver EnvioResultadoService.VigenciaToken en el código, 30 minutos).
+-- Pendiente de mejora documentado: no hay todavía una tarea programada que purgue filas ya
+-- expiradas de esta tabla.
+CREATE TABLE dbo.EnvioResultadoToken (
+    Token            CHAR(32)       NOT NULL,
+    CodigoEvaluado   INT            NOT NULL,
+    IdPeriodo        INT            NOT NULL,
+    ImagenPng        VARBINARY(MAX) NOT NULL,
+    FechaCreacion    DATETIME2(0)   NOT NULL,
+    FechaExpiracion  DATETIME2(0)   NOT NULL,
+    CONSTRAINT PK_EnvioResultadoToken PRIMARY KEY (Token),
+    CONSTRAINT FK_EnvioResultadoToken_Empleado FOREIGN KEY (CodigoEvaluado) REFERENCES dbo.Empleado (CodigoEmpleado),
+    CONSTRAINT FK_EnvioResultadoToken_Periodo FOREIGN KEY (IdPeriodo) REFERENCES dbo.PeriodoEvaluacion (IdPeriodo)
+);
+GO
+
 -- =========================================================
 -- 2. CATÁLOGOS BASE
 -- =========================================================
@@ -298,6 +331,19 @@ VALUES
     (1020, '10000020', N'Marlon Andrés Quintero',   N'Auxiliar de Alistamiento',           N'Producción',       5, 1005, 'marlon.quintero@alianzagrafica.com',  'Activo', '2022-06-06'),
     (1021, '10000021', N'Rocío del Pilar Sánchez',  N'Auxiliar de Aseo Industrial',        N'Planta General',   5, 1006, 'rocio.sanchez@alianzagrafica.com',    'Activo', '2020-01-20'),
     (1022, '10000022', N'Kevin Santiago Bautista',  N'Auxiliar de Empaque y Despacho',     N'Producción',       5, 1005, 'kevin.bautista@alianzagrafica.com',   'Activo', '2023-02-14');
+GO
+
+-- Contacto de WhatsApp de ejemplo (RF-23) para un subconjunto de empleados — números
+-- ficticios, para poder probar el envío del resumen de resultados sin depender de Novasoft.
+-- No es obligatorio que todos los empleados tengan un número: los que no lo tengan
+-- simplemente no reciben el resumen por ese canal (solo por correo).
+INSERT INTO dbo.ContactoNotificacion (CodigoEmpleado, TelefonoWhatsApp, FechaActualizacion) VALUES
+    (1001, '3000000001', SYSUTCDATETIME()),
+    (1002, '3000000002', SYSUTCDATETIME()),
+    (1004, '3000000004', SYSUTCDATETIME()),
+    (1005, '3000000005', SYSUTCDATETIME()),
+    (1013, '3000000013', SYSUTCDATETIME()),
+    (1023, '3000000023', SYSUTCDATETIME());
 GO
 
 -- =========================================================
@@ -550,7 +596,9 @@ UNION ALL SELECT 'FormularioCompetencia', COUNT(*) FROM dbo.FormularioCompetenci
 UNION ALL SELECT 'AsignacionEvaluacion', COUNT(*) FROM dbo.AsignacionEvaluacion
 UNION ALL SELECT 'RespuestaEvaluacion', COUNT(*) FROM dbo.RespuestaEvaluacion
 UNION ALL SELECT 'RespuestaDetalle', COUNT(*) FROM dbo.RespuestaDetalle
-UNION ALL SELECT 'ResultadoConsolidado', COUNT(*) FROM dbo.ResultadoConsolidado;
+UNION ALL SELECT 'ResultadoConsolidado', COUNT(*) FROM dbo.ResultadoConsolidado
+UNION ALL SELECT 'ContactoNotificacion', COUNT(*) FROM dbo.ContactoNotificacion
+UNION ALL SELECT 'EnvioResultadoToken', COUNT(*) FROM dbo.EnvioResultadoToken;
 GO
 
 -- 9.2 Organigrama plano: empleado, tipo de personal y jefe directo
