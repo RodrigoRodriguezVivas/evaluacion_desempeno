@@ -42,6 +42,7 @@ public static class Constantes
     public const string TipoAdministrativo = "Administrativo";
     public const string TipoOperario = "Operario";
     public const string TipoAuxiliarPlanta = "Auxiliar de planta";
+    public const string TipoConductor = "Conductor";
 
     // Roles funcionales del sistema (sección 4.2 del documento de diseño)
     public const string RolAdministradorSistema = "Administrador del sistema";

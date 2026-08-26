@@ -31,7 +31,11 @@ public static class DemoSeed
         var administrativo = new TipoPersonal { Nombre = Constantes.TipoAdministrativo, PermiteEvaluacionAscendente = false };
         var operario = new TipoPersonal { Nombre = Constantes.TipoOperario, PermiteEvaluacionAscendente = false };
         var auxiliarPlanta = new TipoPersonal { Nombre = Constantes.TipoAuxiliarPlanta, PermiteEvaluacionAscendente = false };
-        db.TiposPersonal.AddRange(directivo, mandoMedio, administrativo, operario, auxiliarPlanta);
+        // Tipo de personal "Conductor": tomado del formato real de evaluación de desempeño de
+        // Alianzagrafica para el rol de despachos/transporte (código interno GHU-FOR-007) que se
+        // usó como referencia para enriquecer esta demo — ver más abajo, sección "Competencias".
+        var conductor = new TipoPersonal { Nombre = Constantes.TipoConductor, PermiteEvaluacionAscendente = false };
+        db.TiposPersonal.AddRange(directivo, mandoMedio, administrativo, operario, auxiliarPlanta, conductor);
         await db.SaveChangesAsync();
 
         // ---- Empleados (organigrama ficticio de una empresa gráfica industrial) ----
@@ -46,8 +50,9 @@ public static class DemoSeed
         var operarioTroquelado = NuevoEmpleado(2006, "Diana Correa", "Operario de Troquelado", "Producción", operario, jefeProduccion.CodigoEmpleado, "diana.correa@alianzagrafica-demo.com", hoy, ahora);
         var auxiliarBodega = NuevoEmpleado(2007, "Luis Herrera", "Auxiliar de Bodega", "Producción", auxiliarPlanta, jefeProduccion.CodigoEmpleado, "luis.herrera@alianzagrafica-demo.com", hoy, ahora);
         var auxiliarAdmin = NuevoEmpleado(2008, "Paola Giraldo", "Auxiliar Administrativa", "Administración", auxiliarPlanta, jefeAdmin.CodigoEmpleado, "paola.giraldo@alianzagrafica-demo.com", hoy, ahora);
+        var conductorDespachos = NuevoEmpleado(2009, "Diego Salazar", "Conductor de Despachos", "Logística", conductor, jefeProduccion.CodigoEmpleado, "diego.salazar@alianzagrafica-demo.com", hoy, ahora);
 
-        db.Empleados.AddRange(gerente, jefeProduccion, jefeAdmin, analistaNomina, operarioOffset, operarioTroquelado, auxiliarBodega, auxiliarAdmin);
+        db.Empleados.AddRange(gerente, jefeProduccion, jefeAdmin, analistaNomina, operarioOffset, operarioTroquelado, auxiliarBodega, auxiliarAdmin, conductorDespachos);
         await db.SaveChangesAsync();
 
         // ---- Roles ----
@@ -68,9 +73,10 @@ public static class DemoSeed
         var usuarioOperario2 = NuevoUsuarioDemo(operarioTroquelado, ahora);
         var usuarioAuxBodega = NuevoUsuarioDemo(auxiliarBodega, ahora);
         var usuarioAuxAdmin = NuevoUsuarioDemo(auxiliarAdmin, ahora);
+        var usuarioConductor = NuevoUsuarioDemo(conductorDespachos, ahora);
 
         db.Usuarios.AddRange(usuarioGerente, usuarioJefeProduccion, usuarioJefeAdmin, usuarioAnalista,
-            usuarioOperario1, usuarioOperario2, usuarioAuxBodega, usuarioAuxAdmin);
+            usuarioOperario1, usuarioOperario2, usuarioAuxBodega, usuarioAuxAdmin, usuarioConductor);
         await db.SaveChangesAsync();
 
         db.UsuarioRoles.AddRange(
@@ -86,18 +92,121 @@ public static class DemoSeed
             new UsuarioRol { IdUsuario = usuarioOperario1.IdUsuario, IdRol = rolColaborador.IdRol },
             new UsuarioRol { IdUsuario = usuarioOperario2.IdUsuario, IdRol = rolColaborador.IdRol },
             new UsuarioRol { IdUsuario = usuarioAuxBodega.IdUsuario, IdRol = rolColaborador.IdRol },
-            new UsuarioRol { IdUsuario = usuarioAuxAdmin.IdUsuario, IdRol = rolColaborador.IdRol });
+            new UsuarioRol { IdUsuario = usuarioAuxAdmin.IdUsuario, IdRol = rolColaborador.IdRol },
+            new UsuarioRol { IdUsuario = usuarioConductor.IdUsuario, IdRol = rolColaborador.IdRol });
         await db.SaveChangesAsync();
 
         // ---- Competencias (genéricas + específicas por tipo de personal) ----
+        // Las 4 competencias "organizacionales" (genéricas) y las 5 competencias de "rol" del
+        // Conductor se tomaron, con su nombre y definición, del formato real de evaluación de
+        // desempeño de Alianzagrafica (código interno GHU-FOR-007 — hoja de cálculo que hoy se
+        // diligencia manualmente por colaborador). No se usó ningún dato de personas reales
+        // (nombres de trabajadores ni calificaciones) de ese archivo — solo la estructura de
+        // competencias y sus definiciones, que son las mismas para cualquier colaborador del
+        // cargo, no información personal.
         db.Competencias.AddRange(
-            new Competencia { Nombre = "Trabajo en equipo", IdTipoPersonal = null, Activa = true },
-            new Competencia { Nombre = "Comunicación efectiva", IdTipoPersonal = null, Activa = true },
-            new Competencia { Nombre = "Visión estratégica", IdTipoPersonal = directivo.IdTipoPersonal, Activa = true },
-            new Competencia { Nombre = "Liderazgo de equipos", IdTipoPersonal = mandoMedio.IdTipoPersonal, Activa = true },
-            new Competencia { Nombre = "Precisión en el manejo de información", IdTipoPersonal = administrativo.IdTipoPersonal, Activa = true },
-            new Competencia { Nombre = "Calidad en el proceso productivo", IdTipoPersonal = operario.IdTipoPersonal, Activa = true },
-            new Competencia { Nombre = "Cumplimiento de normas de seguridad", IdTipoPersonal = auxiliarPlanta.IdTipoPersonal, Activa = true });
+            // -- Organizacionales (aplican a todos los tipos de personal) --
+            new Competencia
+            {
+                Nombre = "Adherencia a normas y políticas organizacionales",
+                Descripcion = "Capacidad para adaptarse a las normas y políticas de la organización, mostrando compromiso al conocerlas, entenderlas y aplicarlas.",
+                IdTipoPersonal = null,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Compromiso con la calidad del trabajo",
+                Descripcion = "Capacidad para actuar con minuciosidad, velocidad y sentido de urgencia y tomar decisiones para alcanzar los objetivos del puesto de trabajo, del área u organizacionales, con altos niveles de desempeño.",
+                IdTipoPersonal = null,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Trabajo en equipo",
+                Descripcion = "Habilidad para interactuar con las personas, escuchar activamente y ser generador de ideas que faciliten la obtención de resultados exitosos, enmarcados en el beneficio común, por encima de los intereses personales.",
+                IdTipoPersonal = null,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Eficiencia y productividad",
+                Descripcion = "Habilidad para dirigir las propias acciones y/o las de otros de forma que agreguen valor a la organización, alcanzando los objetivos, cumpliendo con el tiempo disponible y con la calidad requerida.",
+                IdTipoPersonal = null,
+                Activa = true,
+            },
+            // -- Específicas por tipo de personal --
+            new Competencia
+            {
+                Nombre = "Visión estratégica",
+                Descripcion = "Capacidad para definir el rumbo de la organización a mediano y largo plazo, anticipando cambios del entorno y alineando los recursos disponibles.",
+                IdTipoPersonal = directivo.IdTipoPersonal,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Liderazgo de equipos",
+                Descripcion = "Capacidad para dirigir, motivar y desarrollar al equipo a cargo, garantizando el cumplimiento de los objetivos del área.",
+                IdTipoPersonal = mandoMedio.IdTipoPersonal,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Precisión en el manejo de información",
+                Descripcion = "Capacidad para procesar y registrar información administrativa con exactitud, evitando errores que afecten los procesos internos.",
+                IdTipoPersonal = administrativo.IdTipoPersonal,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Calidad en el proceso productivo",
+                Descripcion = "Capacidad para ejecutar el proceso productivo cumpliendo los estándares de calidad y minimizando unidades defectuosas.",
+                IdTipoPersonal = operario.IdTipoPersonal,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Cumplimiento de normas de seguridad",
+                Descripcion = "Capacidad para aplicar de forma consistente las normas de seguridad industrial y el uso adecuado de los elementos de protección personal.",
+                IdTipoPersonal = auxiliarPlanta.IdTipoPersonal,
+                Activa = true,
+            },
+            // -- Competencias de rol del Conductor (de la sección "COMPETENCIAS DE ROL" del
+            //    formato GHU-FOR-007, adaptadas al rol de despachos/transporte) --
+            new Competencia
+            {
+                Nombre = "Orientación al cliente",
+                Descripcion = "Capacidad de generar valor agregado y diferenciador a los clientes internos y externos, indagando, conociendo y resolviendo oportunamente sus necesidades.",
+                IdTipoPersonal = conductor.IdTipoPersonal,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Orientación al logro",
+                Descripcion = "Gran capacidad para el seguimiento y velocidad en la consecución de los objetivos propuestos, con facilidad y oportunidad para la toma de decisiones que favorezcan a toda la organización.",
+                IdTipoPersonal = conductor.IdTipoPersonal,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Atención al detalle",
+                Descripcion = "Manejo eficaz y prolongado de información detallada, procurando eliminar el error y las duplicidades en el proceso de despacho y entrega.",
+                IdTipoPersonal = conductor.IdTipoPersonal,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Sentido de la urgencia",
+                Descripcion = "Capacidad para percibir la urgencia real de determinadas tareas y actuar con celeridad para alcanzar su realización en plazos breves de tiempo.",
+                IdTipoPersonal = conductor.IdTipoPersonal,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Escucha activa",
+                Descripcion = "Escucha activa de las instrucciones recibidas, preguntando hasta que los mensajes estén totalmente claros, y estando alerta a los cambios de la operación.",
+                IdTipoPersonal = conductor.IdTipoPersonal,
+                Activa = true,
+            });
         await db.SaveChangesAsync();
 
         // ---- Periodo de evaluación abierto ----

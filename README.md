@@ -22,10 +22,13 @@ distinta — con tres diferencias, todas controladas por la variable de entorno
 1. **Base de datos:** en vez de SQL Server usa SQLite (un solo archivo, sin necesidad de un
    servidor de base de datos aparte) — controlado por `Database:Provider`.
 2. **Datos ficticios automáticos:** al arrancar por primera vez, `Data/DemoSeed.cs` siembra un
-   organigrama ficticio de 8 personas (gerente, dos jefes, analista, dos operarios y dos
-   auxiliares de planta — los cinco tipos de personal del modelo 180°), con un periodo de
-   evaluación ya abierto y sus asignaciones generadas, para que la demo tenga contenido
-   navegable desde el primer segundo.
+   organigrama ficticio de 9 personas (gerente, dos jefes, analista, dos operarios, dos
+   auxiliares de planta y un conductor de despachos — los seis tipos de personal del modelo
+   180°), con un periodo de evaluación ya abierto y sus asignaciones generadas, para que la demo
+   tenga contenido navegable desde el primer segundo. Las competencias organizacionales y las de
+   rol del Conductor se tomaron (nombre y definición, sin datos de personas reales) del formato
+   de evaluación de desempeño que Alianzagrafica diligencia hoy en Excel (código interno
+   GHU-FOR-007), para que la demo se sienta más cercana al proceso actual de la empresa.
 3. **Aviso visible:** un banner amarillo en cada página ("Ambiente de demostración con datos
    ficticios") para que nadie confunda la demo con el sistema de producción.
 
@@ -116,6 +119,7 @@ Inicia sesión con cualquiera de estos usuarios y la clave `Demo2026*` (definida
 | `luis.herrera@alianzagrafica-demo.com` | Auxiliar de Bodega — colaborador evaluado |
 | `sandra.palacio@alianzagrafica-demo.com` | Analista de Nómina — colaboradora evaluada |
 | `paola.giraldo@alianzagrafica-demo.com` | Auxiliar Administrativa — colaboradora evaluada |
+| `diego.salazar@alianzagrafica-demo.com` | Conductor de Despachos — colaborador evaluado con competencias de rol propias (Orientación al cliente, Orientación al logro, Atención al detalle, Sentido de la urgencia, Escucha activa) |
 
 Con `camila.torres` puedes recorrer todo: diligenciar su propia autoevaluación, crear/abrir/cerrar
 periodos, generar asignaciones, administrar competencias y revisar la bitácora de auditoría. Con

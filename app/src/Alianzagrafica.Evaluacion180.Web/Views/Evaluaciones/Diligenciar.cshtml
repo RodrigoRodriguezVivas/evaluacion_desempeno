@@ -18,6 +18,10 @@
 else
 {
     <p class="escala-ayuda">Escala: 1 = Insatisfactorio · 2 = En desarrollo · 3 = Cumple lo esperado · 4 = Sobresaliente · 5 = Excepcional</p>
+    <p class="escala-ayuda small text-muted">
+        Equivalencia con la escala de calificación del formato interno anterior (GHU-FOR-007):
+        1-2 ≈ Deficiente (0%-59%) · 3 ≈ Aceptable (60%-79%) · 4 ≈ Bueno (80%-90%) · 5 ≈ Sobresaliente (91%-100%).
+    </p>
 
     <form asp-action="GuardarBorrador" method="post" id="formEvaluacion">
         <input type="hidden" asp-for="IdAsignacion" />
