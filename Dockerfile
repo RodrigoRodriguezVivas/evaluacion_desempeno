@@ -22,6 +22,7 @@ COPY --from=build /app/publicar .
 RUN mkdir -p /data
 
 ENV ASPNETCORE_ENVIRONMENT=Demo
+ENV DOTNET_gcServer=0
 
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
