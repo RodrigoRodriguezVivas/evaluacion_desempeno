@@ -10,7 +10,7 @@ RUN dotnet restore ./Alianzagrafica.Evaluacion180.Web/Alianzagrafica.Evaluacion1
 
 COPY app/src/Alianzagrafica.Evaluacion180.Web/ ./Alianzagrafica.Evaluacion180.Web/
 WORKDIR /src/Alianzagrafica.Evaluacion180.Web
-RUN dotnet publish -c Release -r linux-x64 --self-contained false
+RUN dotnet publish -c Release -r linux-x64 --self-contained false -o /app/publicar --no-restore
 
 # ---- Etapa de ejecución ----
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
