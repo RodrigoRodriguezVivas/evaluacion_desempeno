@@ -1,0 +1,72 @@
+@model List<PeriodoListaItemViewModel>
+@{
+    ViewData["Title"] = "Periodos de evaluación";
+}
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <h1 class="h3 mb-0">Periodos de evaluación</h1>
+    <a class="btn btn-primary" asp-action="Crear">Nuevo periodo</a>
+</div>
+
+@if (Model.Count == 0)
+{
+    <p class="text-muted">Todavía no se ha creado ningún periodo.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table bg-white align-middle">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Apertura</th>
+                    <th>Cierre</th>
+                    <th>Estado</th>
+                    <th>Formularios</th>
+                    <th>Asignaciones</th>
+                    <th class="text-end">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var p in Model)
+                {
+                    <tr>
+                        <td>@p.Nombre</td>
+                        <td>@p.FechaApertura.ToString("dd/MM/yyyy")</td>
+                        <td>@p.FechaCierre.ToString("dd/MM/yyyy")</td>
+                        <td>
+                            <span class="badge @(p.Estado == Constantes.PeriodoAbierto ? "badge-completada" : p.Estado == Constantes.PeriodoCerrado ? "bg-secondary" : "badge-pendiente")">@p.Estado</span>
+                        </td>
+                        <td>@p.TotalFormularios</td>
+                        <td>@p.TotalAsignaciones</td>
+                        <td class="text-end">
+                            <div class="d-flex gap-1 justify-content-end flex-wrap">
+                                @if (p.TotalAsignaciones == 0)
+                                {
+                                    <form asp-action="GenerarAsignaciones" asp-route-id="@p.IdPeriodo" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-primary">Generar asignaciones</button>
+                                    </form>
+                                }
+                                @if (p.Estado == Constantes.PeriodoProgramado)
+                                {
+                                    <form asp-action="Abrir" asp-route-id="@p.IdPeriodo" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-primary" onclick="return confirm('¿Abrir este periodo y notificar a los evaluadores?');">Abrir y notificar</button>
+                                    </form>
+                                }
+                                @if (p.Estado == Constantes.PeriodoAbierto)
+                                {
+                                    <form asp-action="EnviarRecordatorios" asp-route-id="@p.IdPeriodo" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-secondary">Enviar recordatorios</button>
+                                    </form>
+                                    <form asp-action="Cerrar" asp-route-id="@p.IdPeriodo" method="post" class="d-inline">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" onclick="return confirm('¿Cerrar este periodo? Los resultados quedarán en modo de solo lectura.');">Cerrar</button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

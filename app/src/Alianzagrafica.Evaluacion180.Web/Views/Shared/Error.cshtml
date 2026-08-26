@@ -1,0 +1,15 @@
+@model ErrorViewModel
+@{
+    ViewData["Title"] = "Error";
+    Layout = "_LayoutSinSesion";
+}
+
+<div class="text-center mt-5">
+    <h1 class="h3 text-danger">Ocurrió un error</h1>
+    <p class="text-muted">Se presentó un problema procesando tu solicitud. Si persiste, contacta al administrador del sistema.</p>
+    @if (Model.ShowRequestId)
+    {
+        <p><small class="text-muted">Id. de solicitud: <code>@Model.RequestId</code></small></p>
+    }
+    <a class="btn btn-primary" asp-controller="Home" asp-action="Index">Volver al inicio</a>
+</div>

@@ -1,0 +1,92 @@
+:root {
+    --azul-marca: #1f3864;
+    --azul-marca-claro: #d9e2f3;
+    --acento: #c0392b;
+}
+
+html, body {
+    height: 100%;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    background-color: #f5f7fa;
+}
+
+.app-navbar {
+    background-color: var(--azul-marca);
+}
+
+.app-container {
+    flex: 1 0 auto;
+}
+
+.app-footer {
+    flex-shrink: 0;
+    background-color: #eef1f6;
+    border-top: 1px solid #dde3ec;
+}
+
+.card-metrica {
+    border: none;
+    border-radius: 0.75rem;
+    box-shadow: 0 1px 4px rgba(31, 56, 100, 0.12);
+}
+
+.card-metrica .valor {
+    font-size: 2.25rem;
+    font-weight: 700;
+    color: var(--azul-marca);
+}
+
+.badge-relacion {
+    background-color: var(--azul-marca-claro);
+    color: var(--azul-marca);
+    font-weight: 600;
+}
+
+.badge-pendiente {
+    background-color: #fdecea;
+    color: var(--acento);
+}
+
+.badge-completada {
+    background-color: #e6f4ea;
+    color: #1e7e34;
+}
+
+.tabla-competencias th {
+    background-color: var(--azul-marca-claro);
+    color: var(--azul-marca);
+}
+
+.escala-ayuda {
+    font-size: 0.8rem;
+    color: #6c757d;
+}
+
+.btn-primary {
+    background-color: var(--azul-marca);
+    border-color: var(--azul-marca);
+}
+
+.btn-primary:hover, .btn-primary:focus {
+    background-color: #16294a;
+    border-color: #16294a;
+}
+
+.login-card {
+    max-width: 420px;
+    margin: 4rem auto;
+}
+
+.aviso-ficticio {
+    border-left: 4px solid #bf8f00;
+    background-color: #fff8e6;
+    color: #7f6000;
+    padding: 0.6rem 1rem;
+    font-size: 0.85rem;
+    border-radius: 0.25rem;
+}

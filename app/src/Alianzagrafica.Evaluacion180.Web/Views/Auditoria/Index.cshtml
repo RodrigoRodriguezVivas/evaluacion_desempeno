@@ -1,0 +1,37 @@
+@model List<AuditoriaItemViewModel>
+@{
+    ViewData["Title"] = "Auditoría";
+}
+
+<h1 class="h3 mt-4 mb-1">Auditoría</h1>
+<p class="text-muted mb-3">Últimos 200 eventos registrados por el sistema (RF-22).</p>
+
+<div class="table-responsive">
+    <table class="table table-sm bg-white align-middle">
+        <thead>
+            <tr>
+                <th>Fecha y hora</th>
+                <th>Usuario</th>
+                <th>Evento</th>
+                <th>Detalle</th>
+                <th>IP</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in Model)
+            {
+                <tr>
+                    <td class="small">@e.FechaHora.ToString("dd/MM/yyyy HH:mm:ss")</td>
+                    <td>@(e.Usuario ?? "—")</td>
+                    <td>@e.TipoEvento</td>
+                    <td class="small text-muted">@e.Detalle</td>
+                    <td class="small">@e.DireccionIP</td>
+                </tr>
+            }
+            @if (Model.Count == 0)
+            {
+                <tr><td colspan="5" class="text-center text-muted py-3">No hay eventos registrados todavía.</td></tr>
+            }
+        </tbody>
+    </table>
+</div>

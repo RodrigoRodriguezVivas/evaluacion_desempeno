@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>alianzagrafica-evaluacion180</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Incluye transitivamente Microsoft.EntityFrameworkCore y Microsoft.EntityFrameworkCore.Relational.
+         Se fija la versión 8.0.x para alinear con el SDK de .NET 8 usado por el proyecto; puede
+         actualizarse a la última versión 8.0.x disponible al momento de compilar en un entorno
+         con acceso a NuGet.org. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="8.0.11" />
+
+    <!-- Solo se usa cuando Database:Provider=Sqlite (ambiente de DEMOSTRACIÓN — ver appsettings.Demo.json
+         y README.md, sección "Versión demo"). El despliegue real en el IIS de Alianzagrafica siempre usa
+         SQL Server (Database:Provider=SqlServer, el valor por defecto). -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="8.0.11" />
+  </ItemGroup>
+
+</Project>

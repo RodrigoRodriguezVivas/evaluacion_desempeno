@@ -1,0 +1,47 @@
+@model List<EmpleadoListaItemViewModel>
+@{
+    ViewData["Title"] = "Empleados";
+}
+
+<h1 class="h3 mt-4 mb-1">Empleados</h1>
+<div class="aviso-ficticio mb-3">
+    Esta información proviene hoy de la tabla ficticia de empleados. En producción se sincroniza
+    en modo de solo lectura desde Novasoft (sección 8.4 del documento de diseño) — este sistema
+    nunca edita datos maestros de empleados.
+</div>
+
+<form method="get" class="mb-3" style="max-width: 360px;">
+    <input type="text" name="q" value="@ViewBag.Busqueda" class="form-control" placeholder="Buscar por nombre, cargo o área..." />
+</form>
+
+<div class="table-responsive">
+    <table class="table table-sm bg-white align-middle">
+        <thead>
+            <tr>
+                <th>Código</th>
+                <th>Nombre</th>
+                <th>Cargo</th>
+                <th>Área</th>
+                <th>Tipo de personal</th>
+                <th>Jefe directo</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var e in Model)
+            {
+                <tr>
+                    <td>@e.CodigoEmpleado</td>
+                    <td>@e.Nombre</td>
+                    <td>@e.Cargo</td>
+                    <td>@e.Area</td>
+                    <td><span class="badge badge-relacion">@e.TipoPersonal</span></td>
+                    <td>@(e.JefeDirecto ?? "—")</td>
+                    <td>
+                        <span class="badge @(e.Estado == Constantes.EstadoEmpleadoActivo ? "badge-completada" : "bg-secondary")">@e.Estado</span>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

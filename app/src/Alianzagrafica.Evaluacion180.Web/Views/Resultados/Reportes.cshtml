@@ -1,0 +1,78 @@
+@model ReportesViewModel
+@{
+    ViewData["Title"] = "Reportes";
+}
+
+<h1 class="h3 mt-4 mb-1">Reportes — @(Model.PeriodoNombre ?? "sin periodo")</h1>
+<p class="text-muted mb-4">Avance del periodo y resultados consolidados por área.</p>
+
+@if (Model.PeriodoNombre is null)
+{
+    <div class="alert alert-secondary">Aún no se ha creado ningún periodo de evaluación.</div>
+}
+else
+{
+    <h2 class="h5">Avance por área</h2>
+    <div class="table-responsive mb-4">
+        <table class="table bg-white align-middle">
+            <thead>
+                <tr>
+                    <th>Área</th>
+                    <th>Asignadas</th>
+                    <th>Completadas</th>
+                    <th>Pendientes</th>
+                    <th>Avance</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.AvancePorArea)
+                {
+                    <tr>
+                        <td>@a.Area</td>
+                        <td>@a.TotalAsignadas</td>
+                        <td>@a.Completadas</td>
+                        <td>@a.Pendientes</td>
+                        <td style="min-width: 160px;">
+                            <div class="progress" role="progressbar" aria-valuenow="@a.PorcentajeAvance" aria-valuemin="0" aria-valuemax="100">
+                                <div class="progress-bar" style="width: @(a.PorcentajeAvance)%">@a.PorcentajeAvance%</div>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+
+    <h2 class="h5">Resultados consolidados</h2>
+    <p class="small text-muted">Se resalta en rojo a quienes tienen promedio general por debajo de @Model.UmbralAlerta (RF-18).</p>
+    <div class="table-responsive">
+        <table class="table bg-white align-middle">
+            <thead>
+                <tr>
+                    <th>Empleado</th>
+                    <th>Cargo</th>
+                    <th>Tipo de personal</th>
+                    <th>Área</th>
+                    <th>Promedio general</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Resultados)
+                {
+                    var alerta = r.PromedioGeneral is decimal p && p < Model.UmbralAlerta;
+                    <tr class="@(alerta ? "table-danger" : "")">
+                        <td>@r.NombreEmpleado</td>
+                        <td>@r.Cargo</td>
+                        <td>@r.TipoPersonal</td>
+                        <td>@r.Area</td>
+                        <td><strong>@(r.PromedioGeneral?.ToString("0.00") ?? "—")</strong></td>
+                    </tr>
+                }
+                @if (Model.Resultados.Count == 0)
+                {
+                    <tr><td colspan="5" class="text-muted text-center py-3">Todavía no hay resultados consolidados para este periodo.</td></tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

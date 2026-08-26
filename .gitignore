@@ -1,0 +1,17 @@
+# Compilación de .NET
+bin/
+obj/
+*.user
+
+# Editores / IDE
+.vs/
+.vscode/
+*.swp
+
+# Secretos locales (dotnet user-secrets) — nunca deben subirse al repositorio
+**/secrets.json
+
+# Base de datos SQLite local (si se corre el modo demo fuera de Docker)
+*.db
+*.db-shm
+*.db-wal

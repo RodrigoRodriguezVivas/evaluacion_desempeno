@@ -1,0 +1,74 @@
+@model MisEvaluacionesViewModel
+@{
+    ViewData["Title"] = "Mis evaluaciones";
+}
+
+<h1 class="h3 mt-4 mb-4">Mis evaluaciones</h1>
+
+<h2 class="h5">Pendientes (@Model.Pendientes.Count)</h2>
+@if (Model.Pendientes.Count == 0)
+{
+    <p class="text-muted">No tienes evaluaciones pendientes por diligenciar.</p>
+}
+else
+{
+    <div class="table-responsive mb-4">
+        <table class="table table-hover align-middle bg-white">
+            <thead>
+                <tr>
+                    <th>Evaluado</th>
+                    <th>Tipo de evaluación</th>
+                    <th>Periodo</th>
+                    <th>Cierra</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.Pendientes)
+                {
+                    <tr>
+                        <td>@a.NombreEvaluado <div class="small text-muted">@a.CargoEvaluado</div></td>
+                        <td><span class="badge badge-relacion">@a.TipoRelacionTexto</span></td>
+                        <td>@a.PeriodoNombre</td>
+                        <td>@a.PeriodoFechaCierre.ToString("dd/MM/yyyy")</td>
+                        <td class="text-end">
+                            <a class="btn btn-sm btn-primary" asp-action="Diligenciar" asp-route-id="@a.IdAsignacion">Diligenciar</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+<h2 class="h5">Completadas (@Model.Completadas.Count)</h2>
+@if (Model.Completadas.Count == 0)
+{
+    <p class="text-muted">Aún no has completado evaluaciones.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-sm bg-white">
+            <thead>
+                <tr>
+                    <th>Evaluado</th>
+                    <th>Tipo de evaluación</th>
+                    <th>Periodo</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var a in Model.Completadas)
+                {
+                    <tr>
+                        <td>@a.NombreEvaluado</td>
+                        <td><span class="badge badge-relacion">@a.TipoRelacionTexto</span></td>
+                        <td>@a.PeriodoNombre</td>
+                        <td class="text-end"><a class="btn btn-sm btn-outline-secondary" asp-action="Diligenciar" asp-route-id="@a.IdAsignacion">Ver</a></td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

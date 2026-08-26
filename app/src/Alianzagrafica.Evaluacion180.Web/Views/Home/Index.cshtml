@@ -1,0 +1,57 @@
+@model DashboardViewModel
+@{
+    ViewData["Title"] = "Inicio";
+}
+
+<div class="mt-4 mb-4">
+    <h1 class="h3">Hola, @Model.NombreEmpleado</h1>
+    <p class="text-muted mb-0">@Model.Cargo · @Model.TipoPersonal</p>
+    @if (Model.Roles.Count > 0)
+    {
+        <p class="small text-muted">Roles: @string.Join(", ", Model.Roles)</p>
+    }
+</div>
+
+@if (Model.PeriodoActualNombre is null)
+{
+    <div class="alert alert-secondary">No hay un periodo de evaluación abierto actualmente.</div>
+}
+else
+{
+    <p class="mb-4">Periodo activo: <strong>@Model.PeriodoActualNombre</strong></p>
+}
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="card card-metrica h-100">
+            <div class="card-body text-center">
+                <div class="valor">@Model.EvaluacionesPendientes</div>
+                <div class="text-muted">Evaluaciones pendientes</div>
+                <a class="btn btn-sm btn-outline-primary mt-3" asp-controller="Evaluaciones" asp-action="Mis">Ver mis evaluaciones</a>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-metrica h-100">
+            <div class="card-body text-center">
+                <div class="valor">@Model.EvaluacionesCompletadas</div>
+                <div class="text-muted">Evaluaciones completadas</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card card-metrica h-100">
+            <div class="card-body text-center d-flex flex-column justify-content-center">
+                <div class="text-muted mb-2">Mis resultados históricos</div>
+                <a class="btn btn-sm btn-outline-primary" asp-controller="Resultados" asp-action="Mios">Consultar</a>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (Model.EsAdministrador)
+{
+    <div class="mt-4">
+        <a class="btn btn-primary" asp-controller="Periodos" asp-action="Index">Ir a Administración de periodos</a>
+    </div>
+}

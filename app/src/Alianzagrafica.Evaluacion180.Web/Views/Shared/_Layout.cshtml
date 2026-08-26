@@ -1,0 +1,95 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuracion
+@{
+    var esAdminGH = User.IsInRole(Constantes.RolAdministradorGestionHumana);
+    var esAdminSistema = User.IsInRole(Constantes.RolAdministradorSistema);
+    var esConsultaDirectiva = User.IsInRole(Constantes.RolConsultaDirectiva);
+    var puedeVerReportes = esAdminGH || esAdminSistema || esConsultaDirectiva;
+    var puedeAdministrar = esAdminGH || esAdminSistema;
+    var esDemo = Configuracion.GetValue<bool>("Demo:Habilitado");
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — Evaluación de Desempeño 180° | Alianzagrafica</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <header>
+        <nav class="navbar navbar-expand-lg navbar-dark app-navbar">
+            <div class="container-fluid">
+                <a class="navbar-brand fw-semibold" asp-controller="Home" asp-action="Index">
+                    Alianzagrafica <span class="fw-light">· Evaluación 180°</span>
+                </a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarPrincipal">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarPrincipal">
+                    @if (User.Identity?.IsAuthenticated ?? false)
+                    {
+                        <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                            <li class="nav-item"><a class="nav-link" asp-controller="Home" asp-action="Index">Inicio</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Evaluaciones" asp-action="Mis">Mis evaluaciones</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Resultados" asp-action="Mios">Mis resultados</a></li>
+                            @if (puedeVerReportes)
+                            {
+                                <li class="nav-item"><a class="nav-link" asp-controller="Resultados" asp-action="Reportes">Reportes</a></li>
+                            }
+                            @if (puedeAdministrar)
+                            {
+                                <li class="nav-item dropdown">
+                                    <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown">Administración</a>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item" asp-controller="Periodos" asp-action="Index">Periodos de evaluación</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Competencias" asp-action="Index">Competencias</a></li>
+                                        <li><a class="dropdown-item" asp-controller="Empleados" asp-action="Index">Empleados</a></li>
+                                        @if (esAdminSistema)
+                                        {
+                                            <li><a class="dropdown-item" asp-controller="Auditoria" asp-action="Index">Auditoría</a></li>
+                                        }
+                                    </ul>
+                                </li>
+                            }
+                        </ul>
+                        <form asp-controller="Cuenta" asp-action="CerrarSesion" method="post" class="d-flex align-items-center">
+                            <span class="text-light small me-3">@User.Identity!.Name</span>
+                            <button type="submit" class="btn btn-outline-light btn-sm">Cerrar sesión</button>
+                        </form>
+                    }
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    @if (esDemo)
+    {
+        <div class="alert alert-warning text-center mb-0 rounded-0 py-2 small" role="alert">
+            🔷 Ambiente de <strong>demostración</strong> con datos ficticios — no es el sistema de producción de Alianzagrafica.
+        </div>
+    }
+
+    <div class="container app-container">
+        @if (TempData["Mensaje"] is string mensaje)
+        {
+            <div class="alert alert-success alert-dismissible fade show mt-3" role="alert">
+                @mensaje
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+            </div>
+        }
+        <main role="main" class="pb-5">
+            @RenderBody()
+        </main>
+    </div>
+
+    <footer class="app-footer text-center text-muted py-3 small">
+        &copy; @DateTime.Now.Year — Alianzagrafica — Sistema de Evaluación de Desempeño 180°
+    </footer>
+
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

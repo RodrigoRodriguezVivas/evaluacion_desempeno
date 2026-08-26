@@ -1,0 +1,43 @@
+@model List<CompetenciaListaItemViewModel>
+@{
+    ViewData["Title"] = "Competencias";
+}
+
+<div class="d-flex justify-content-between align-items-center mt-4 mb-3">
+    <h1 class="h3 mb-0">Competencias</h1>
+    <a class="btn btn-primary" asp-action="Crear">Nueva competencia</a>
+</div>
+
+<p class="small text-muted">Los cambios aquí solo aplican a los periodos que se creen a partir de ahora; no modifican los formularios de periodos ya generados.</p>
+
+<div class="table-responsive">
+    <table class="table bg-white align-middle">
+        <thead>
+            <tr>
+                <th>Nombre</th>
+                <th>Grupo</th>
+                <th>Descripción</th>
+                <th>Estado</th>
+                <th class="text-end">Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var c in Model)
+            {
+                <tr>
+                    <td>@c.Nombre</td>
+                    <td><span class="badge badge-relacion">@c.Grupo</span></td>
+                    <td class="small text-muted">@c.Descripcion</td>
+                    <td>
+                        <span class="badge @(c.Activa ? "badge-completada" : "bg-secondary")">@(c.Activa ? "Activa" : "Inactiva")</span>
+                    </td>
+                    <td class="text-end">
+                        <form asp-action="AlternarActiva" asp-route-id="@c.IdCompetencia" method="post" class="d-inline">
+                            <button type="submit" class="btn btn-sm btn-outline-secondary">@(c.Activa ? "Desactivar" : "Activar")</button>
+                        </form>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>

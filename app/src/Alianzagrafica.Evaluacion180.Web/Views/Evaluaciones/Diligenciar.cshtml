@@ -1,0 +1,103 @@
+@model DiligenciarEvaluacionViewModel
+@{
+    ViewData["Title"] = "Diligenciar evaluación";
+}
+
+<h1 class="h3 mt-4">Evaluación — @Model.TipoRelacionTexto</h1>
+<p class="text-muted">
+    Evaluado: <strong>@Model.NombreEvaluado</strong> (@Model.CargoEvaluado) · Periodo: @Model.PeriodoNombre<br />
+    Formulario: @Model.NombreFormulario
+</p>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+@if (Model.Items.Count == 0)
+{
+    <div class="alert alert-warning">Este formulario no tiene competencias configuradas todavía. Contacta al administrador de Gestión Humana.</div>
+}
+else
+{
+    <p class="escala-ayuda">Escala: 1 = Insatisfactorio · 2 = En desarrollo · 3 = Cumple lo esperado · 4 = Sobresaliente · 5 = Excepcional</p>
+
+    <form asp-action="GuardarBorrador" method="post" id="formEvaluacion">
+        <input type="hidden" asp-for="IdAsignacion" />
+        <input type="hidden" asp-for="NombreEvaluado" />
+        <input type="hidden" asp-for="CargoEvaluado" />
+        <input type="hidden" asp-for="TipoRelacionTexto" />
+        <input type="hidden" asp-for="NombreFormulario" />
+        <input type="hidden" asp-for="PeriodoNombre" />
+        <input type="hidden" asp-for="SoloLectura" />
+
+        <div class="table-responsive">
+            <table class="table tabla-competencias bg-white align-middle">
+                <thead>
+                    <tr>
+                        <th style="width: 22%">Competencia</th>
+                        <th>Descripción</th>
+                        <th style="width: 10%">Ponderación</th>
+                        <th style="width: 12%">Calificación</th>
+                        <th style="width: 24%">Comentario</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @for (var i = 0; i < Model.Items.Count; i++)
+                    {
+                        <tr>
+                            <td>
+                                <strong>@Model.Items[i].Nombre</strong>
+                                <input type="hidden" asp-for="Items[i].IdCompetencia" />
+                                <input type="hidden" asp-for="Items[i].Nombre" />
+                                <input type="hidden" asp-for="Items[i].Ponderacion" />
+                            </td>
+                            <td class="small text-muted">@Model.Items[i].Descripcion</td>
+                            <td>@Model.Items[i].Ponderacion%</td>
+                            <td>
+                                @if (Model.SoloLectura)
+                                {
+                                    <span class="fw-bold">@(Model.Items[i].Calificacion?.ToString() ?? "—")</span>
+                                }
+                                else
+                                {
+                                    <select asp-for="Items[i].Calificacion" class="form-select form-select-sm">
+                                        <option value="">—</option>
+                                        <option value="1">1</option>
+                                        <option value="2">2</option>
+                                        <option value="3">3</option>
+                                        <option value="4">4</option>
+                                        <option value="5">5</option>
+                                    </select>
+                                }
+                            </td>
+                            <td>
+                                @if (Model.SoloLectura)
+                                {
+                                    <span class="small">@Model.Items[i].Comentario</span>
+                                }
+                                else
+                                {
+                                    <textarea asp-for="Items[i].Comentario" class="form-control form-control-sm" rows="2"></textarea>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        @if (!Model.SoloLectura)
+        {
+            <div class="d-flex gap-2 mt-3">
+                <button type="submit" formaction="@Url.Action("GuardarBorrador")" class="btn btn-outline-secondary">Guardar borrador</button>
+                <button type="submit" formaction="@Url.Action("Enviar")" class="btn btn-primary" onclick="return confirm('Una vez enviada, la evaluación no se podrá editar. ¿Deseas continuar?');">Enviar evaluación definitiva</button>
+                <a class="btn btn-link" asp-action="Mis">Cancelar</a>
+            </div>
+        }
+        else
+        {
+            <div class="mt-3">
+                <span class="badge badge-completada">Evaluación enviada — solo lectura</span>
+                <a class="btn btn-link" asp-action="Mis">Volver</a>
+            </div>
+        }
+    </form>
+}

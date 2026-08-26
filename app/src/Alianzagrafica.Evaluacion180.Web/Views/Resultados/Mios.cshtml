@@ -1,0 +1,41 @@
+@model MisResultadosViewModel
+@{
+    ViewData["Title"] = "Mis resultados";
+}
+
+<h1 class="h3 mt-4 mb-4">Mis resultados — @Model.NombreEmpleado</h1>
+
+@if (Model.Historico.Count == 0)
+{
+    <p class="text-muted">Todavía no tienes resultados consolidados. Aparecerán aquí cuando termines un periodo de evaluación completo.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table bg-white align-middle">
+            <thead>
+                <tr>
+                    <th>Periodo</th>
+                    <th>Autoevaluación</th>
+                    <th>Evaluación del jefe</th>
+                    <th>Evaluación ascendente</th>
+                    <th>Promedio general</th>
+                    <th>Consolidado el</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Historico)
+                {
+                    <tr>
+                        <td>@r.PeriodoNombre</td>
+                        <td>@(r.PromedioAutoevaluacion?.ToString("0.00") ?? "—")</td>
+                        <td>@(r.PromedioJefe?.ToString("0.00") ?? "—")</td>
+                        <td>@(r.PromedioAscendente?.ToString("0.00") ?? "—")</td>
+                        <td><strong>@(r.PromedioGeneral?.ToString("0.00") ?? "—")</strong></td>
+                        <td class="small text-muted">@(r.FechaConsolidacion?.ToString("dd/MM/yyyy") ?? "—")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}

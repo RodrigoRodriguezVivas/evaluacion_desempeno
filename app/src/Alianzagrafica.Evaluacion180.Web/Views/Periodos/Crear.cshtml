@@ -1,0 +1,33 @@
+@model CrearPeriodoViewModel
+@{
+    ViewData["Title"] = "Nuevo periodo";
+}
+
+<h1 class="h3 mt-4 mb-4">Nuevo periodo de evaluación</h1>
+
+<div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+<form asp-action="Crear" method="post" class="bg-white p-4 rounded shadow-sm" style="max-width: 520px;">
+    <div class="mb-3">
+        <label asp-for="Nombre" class="form-label"></label>
+        <input asp-for="Nombre" class="form-control" placeholder="Ej. Evaluación de Desempeño 2027" />
+        <span asp-validation-for="Nombre" class="text-danger small"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="FechaApertura" class="form-label"></label>
+        <input asp-for="FechaApertura" class="form-control" />
+        <span asp-validation-for="FechaApertura" class="text-danger small"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="FechaCierre" class="form-label"></label>
+        <input asp-for="FechaCierre" class="form-control" />
+        <span asp-validation-for="FechaCierre" class="text-danger small"></span>
+    </div>
+    <p class="small text-muted">Al crear el periodo se generarán automáticamente sus formularios de evaluación (uno de autoevaluación y uno de jefe por cada tipo de personal, más uno ascendente para directivos y mandos medios), con las competencias activas en ese momento.</p>
+    <button type="submit" class="btn btn-primary">Crear periodo</button>
+    <a class="btn btn-link" asp-action="Index">Cancelar</a>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

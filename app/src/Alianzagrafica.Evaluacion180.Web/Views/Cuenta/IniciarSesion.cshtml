@@ -1,0 +1,61 @@
+@model IniciarSesionViewModel
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuracion
+@{
+    ViewData["Title"] = "Iniciar sesión";
+    Layout = "_LayoutSinSesion";
+    var esDemo = Configuracion.GetValue<bool>("Demo:Habilitado");
+    var clavePruebas = Configuracion["Auth:ClavePruebasLocal"];
+}
+
+<div class="card login-card shadow-sm">
+    <div class="card-body p-4">
+        <h1 class="h4 text-center mb-1" style="color: var(--azul-marca);">Alianzagrafica</h1>
+        <p class="text-center text-muted mb-4">Evaluación de Desempeño 180°</p>
+
+        @if (!string.IsNullOrEmpty(Model.MensajeError))
+        {
+            <div class="alert alert-danger">@Model.MensajeError</div>
+        }
+        <div asp-validation-summary="ModelOnly" class="text-danger"></div>
+
+        <form asp-controller="Cuenta" asp-action="IniciarSesion" method="post">
+            <input type="hidden" asp-for="UrlRetorno" />
+            <div class="mb-3">
+                <label asp-for="NombreUsuario" class="form-label"></label>
+                <input asp-for="NombreUsuario" class="form-control" autofocus placeholder="nombre.apellido@alianzagrafica.com" />
+                <span asp-validation-for="NombreUsuario" class="text-danger small"></span>
+            </div>
+            <div class="mb-3">
+                <label asp-for="Clave" class="form-label"></label>
+                <input asp-for="Clave" class="form-control" />
+                <span asp-validation-for="Clave" class="text-danger small"></span>
+            </div>
+            <button type="submit" class="btn btn-primary w-100">Ingresar</button>
+        </form>
+
+        @if (esDemo)
+        {
+            <div class="aviso-ficticio mt-4">
+                <strong>Ambiente de demostración.</strong> Ingresa con cualquiera de estos usuarios ficticios y la
+                clave <code>@clavePruebas</code>:
+                <ul class="mb-0 small">
+                    <li><code>camila.torres@alianzagrafica-demo.com</code> — Gerente General (acceso administrador)</li>
+                    <li><code>julian.restrepo@alianzagrafica-demo.com</code> — Jefe de Producción (evaluador)</li>
+                    <li><code>andres.zapata@alianzagrafica-demo.com</code> — Operario Offset (colaborador)</li>
+                </ul>
+            </div>
+        }
+        else
+        {
+            <div class="aviso-ficticio mt-4">
+                <strong>Modo de pruebas.</strong> Mientras <code>Auth:ModoPruebasLocal</code> esté activo en
+                <code>appsettings.json</code>, cualquier correo de la tabla de empleados de prueba inicia sesión
+                con la clave <code>@clavePruebas</code>. Deshabilita este modo antes de producción (ver README).
+            </div>
+        }
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

@@ -1,0 +1,28 @@
+@inject Microsoft.Extensions.Configuration.IConfiguration Configuracion
+@{
+    var esDemo = Configuracion.GetValue<bool>("Demo:Habilitado");
+}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — Evaluación de Desempeño 180° | Alianzagrafica</title>
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body class="bg-light">
+    @if (esDemo)
+    {
+        <div class="alert alert-warning text-center mb-3 rounded-0 py-2 small" role="alert">
+            🔷 Ambiente de <strong>demostración</strong> con datos ficticios — no es el sistema de producción de Alianzagrafica.
+        </div>
+    }
+    <div class="container">
+        @RenderBody()
+    </div>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>
