@@ -24,6 +24,7 @@ RUN mkdir -p /data
 ENV ASPNETCORE_ENVIRONMENT=Demo
 ENV DOTNET_gcServer=0
 ENV DOTNET_EnableWriteXorExecute=0
+ENV DOTNET_hostBuilder__reloadConfigOnChange=false
 
 COPY docker-entrypoint.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
