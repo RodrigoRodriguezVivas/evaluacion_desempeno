@@ -119,9 +119,11 @@ CREATE TABLE dbo.Competencia (
     Nombre         NVARCHAR(150)      NOT NULL,
     Descripcion    NVARCHAR(400)      NULL,
     IdTipoPersonal INT                NULL,          -- NULL = competencia genérica (aplica a todos)
+    Categoria      VARCHAR(20)        NULL,          -- 'Organizacional' | 'DeRol' (RF-07, macro-grupos de ponderación — ver GHU-FOR-007). NULL = sin macro-grupo (reparto parejo 100%/N, comportamiento histórico).
     Activa         BIT                NOT NULL CONSTRAINT DF_Competencia_Activa DEFAULT (1),
     CONSTRAINT PK_Competencia PRIMARY KEY (IdCompetencia),
-    CONSTRAINT FK_Competencia_TipoPersonal FOREIGN KEY (IdTipoPersonal) REFERENCES dbo.TipoPersonal (IdTipoPersonal)
+    CONSTRAINT FK_Competencia_TipoPersonal FOREIGN KEY (IdTipoPersonal) REFERENCES dbo.TipoPersonal (IdTipoPersonal),
+    CONSTRAINT CK_Competencia_Categoria CHECK (Categoria IN ('Organizacional', 'DeRol') OR Categoria IS NULL)
 );
 GO
 
@@ -279,7 +281,8 @@ INSERT INTO dbo.TipoPersonal (Nombre, PermiteEvaluacionAscendente) VALUES
     (N'Mando medio',         1),
     (N'Administrativo',      0),
     (N'Operario',            0),
-    (N'Auxiliar de planta',  0);
+    (N'Auxiliar de planta',  0),
+    (N'Conductor',           0);
 GO
 
 INSERT INTO dbo.Rol (NombreRol, Descripcion) VALUES
@@ -330,7 +333,12 @@ VALUES
     (1019, '10000019', N'Héctor Julio Peña',        N'Auxiliar de Logística e Insumos',    N'Producción',       5, 1005, 'hector.pena@alianzagrafica.com',      'Activo', '2021-04-19'),
     (1020, '10000020', N'Marlon Andrés Quintero',   N'Auxiliar de Alistamiento',           N'Producción',       5, 1005, 'marlon.quintero@alianzagrafica.com',  'Activo', '2022-06-06'),
     (1021, '10000021', N'Rocío del Pilar Sánchez',  N'Auxiliar de Aseo Industrial',        N'Planta General',   5, 1006, 'rocio.sanchez@alianzagrafica.com',    'Activo', '2020-01-20'),
-    (1022, '10000022', N'Kevin Santiago Bautista',  N'Auxiliar de Empaque y Despacho',     N'Producción',       5, 1005, 'kevin.bautista@alianzagrafica.com',   'Activo', '2023-02-14');
+    (1022, '10000022', N'Kevin Santiago Bautista',  N'Auxiliar de Empaque y Despacho',     N'Producción',       5, 1005, 'kevin.bautista@alianzagrafica.com',   'Activo', '2023-02-14'),
+
+    -- Conductor (rol de despachos/transporte — mismo tipo de personal y el mismo colaborador
+    -- ficticio de ejemplo usado en la demo, Entregable 5, para que ambos entornos sean
+    -- consistentes; ver dbo.TipoPersonal, IdTipoPersonal = 6)
+    (1024, '10000024', N'Diego Alejandro Salazar',  N'Conductor de Despachos',             N'Logística',        6, 1005, 'diego.salazar@alianzagrafica.com',    'Activo', '2022-09-05');
 GO
 
 -- Contacto de WhatsApp de ejemplo (RF-23) para un subconjunto de empleados — números
@@ -399,42 +407,59 @@ GO
 -- 5. COMPETENCIAS (propuesta inicial — sección 5.2 del documento)
 -- =========================================================
 
--- Genéricas (IdTipoPersonal = NULL, aplican a todo el personal)
-INSERT INTO dbo.Competencia (Nombre, IdTipoPersonal) VALUES
-    (N'Compromiso y responsabilidad', NULL),
-    (N'Trabajo en equipo', NULL),
-    (N'Comunicación', NULL),
-    (N'Adaptación al cambio', NULL),
-    (N'Cumplimiento de normas de seguridad industrial y calidad', NULL);
+-- Genéricas (IdTipoPersonal = NULL, aplican a todo el personal). Categoria = 'Organizacional'
+-- (RF-07 — macro-grupo "EVALUACION DE COMPETENCIAS ORGANIZACIONALES", peso 50% del total,
+-- según el formato real GHU-FOR-007 de Alianzagrafica — ver Entregable 5 y el ajuste posterior
+-- de agrupación/ponderación).
+INSERT INTO dbo.Competencia (Nombre, IdTipoPersonal, Categoria) VALUES
+    (N'Compromiso y responsabilidad', NULL, N'Organizacional'),
+    (N'Trabajo en equipo', NULL, N'Organizacional'),
+    (N'Comunicación', NULL, N'Organizacional'),
+    (N'Adaptación al cambio', NULL, N'Organizacional'),
+    (N'Cumplimiento de normas de seguridad industrial y calidad', NULL, N'Organizacional');
 GO
 
--- Específicas por tipo de personal
-INSERT INTO dbo.Competencia (Nombre, IdTipoPersonal)
-SELECT N'Liderazgo y desarrollo de personas', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
-UNION ALL SELECT N'Visión estratégica', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
-UNION ALL SELECT N'Toma de decisiones', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
-UNION ALL SELECT N'Gestión del cambio', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
-UNION ALL SELECT N'Orientación a resultados', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
+-- Específicas por tipo de personal. Categoria = 'DeRol' (macro-grupo "EVALUACION DE
+-- COMPETENCIAS DE ROL", peso 50% del total).
+INSERT INTO dbo.Competencia (Nombre, IdTipoPersonal, Categoria)
+SELECT N'Liderazgo y desarrollo de personas', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
+UNION ALL SELECT N'Visión estratégica', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
+UNION ALL SELECT N'Toma de decisiones', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
+UNION ALL SELECT N'Gestión del cambio', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
+UNION ALL SELECT N'Orientación a resultados', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
 
-UNION ALL SELECT N'Liderazgo de equipos', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
-UNION ALL SELECT N'Planificación y organización', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
-UNION ALL SELECT N'Resolución de problemas', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
-UNION ALL SELECT N'Gestión de indicadores de área', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
+UNION ALL SELECT N'Liderazgo de equipos', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
+UNION ALL SELECT N'Planificación y organización', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
+UNION ALL SELECT N'Resolución de problemas', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
+UNION ALL SELECT N'Gestión de indicadores de área', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
 
-UNION ALL SELECT N'Orientación al servicio interno', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
-UNION ALL SELECT N'Precisión y manejo de detalle', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
-UNION ALL SELECT N'Manejo de herramientas ofimáticas/ERP', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
-UNION ALL SELECT N'Gestión del tiempo', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
+UNION ALL SELECT N'Orientación al servicio interno', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
+UNION ALL SELECT N'Precisión y manejo de detalle', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
+UNION ALL SELECT N'Manejo de herramientas ofimáticas/ERP', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
+UNION ALL SELECT N'Gestión del tiempo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
 
-UNION ALL SELECT N'Calidad y precisión en el proceso productivo', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
-UNION ALL SELECT N'Manejo de maquinaria y equipos', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
-UNION ALL SELECT N'Cumplimiento de estándares de producción', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
-UNION ALL SELECT N'Seguridad y orden en el puesto de trabajo', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
+UNION ALL SELECT N'Calidad y precisión en el proceso productivo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
+UNION ALL SELECT N'Manejo de maquinaria y equipos', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
+UNION ALL SELECT N'Cumplimiento de estándares de producción', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
+UNION ALL SELECT N'Seguridad y orden en el puesto de trabajo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
 
-UNION ALL SELECT N'Disposición y colaboración', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
-UNION ALL SELECT N'Cumplimiento de instrucciones', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
-UNION ALL SELECT N'Orden y aseo', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
-UNION ALL SELECT N'Seguridad industrial', IdTipoPersonal FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta';
+UNION ALL SELECT N'Disposición y colaboración', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
+UNION ALL SELECT N'Cumplimiento de instrucciones', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
+UNION ALL SELECT N'Orden y aseo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
+UNION ALL SELECT N'Seguridad industrial', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
+
+-- Conductor — competencias de rol tomadas del formato real GHU-FOR-007 de Alianzagrafica,
+-- sección "COMPETENCIAS DE ROL" (mismo enriquecimiento aplicado en la demo — ver Entregable 5).
+-- "Trabajo en equipo" tiene aquí su propia versión específica del Conductor, con comportamientos
+-- de coordinación con el equipo de despachos, DISTINTA de la genérica "Organizacional" de arriba
+-- — la consulta de ponderación de la sección 6 hace que la específica reemplace a la genérica
+-- del mismo nombre para este tipo de personal, igual que en AsignacionService (aplicación).
+UNION ALL SELECT N'Orientación al cliente', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
+UNION ALL SELECT N'Trabajo en equipo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
+UNION ALL SELECT N'Orientación al logro', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
+UNION ALL SELECT N'Atención al detalle', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
+UNION ALL SELECT N'Sentido de la urgencia', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
+UNION ALL SELECT N'Escucha activa', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor';
 GO
 
 -- =========================================================
@@ -464,15 +489,51 @@ WHERE p.Nombre = N'Evaluación de Desempeño 2026'
   AND tp.PermiteEvaluacionAscendente = 1;
 GO
 
--- Ponderación: cada formulario incluye las competencias genéricas más las
--- específicas del tipo de personal correspondiente, con peso igual entre ellas.
+-- Ponderación (RF-06/RF-07): cada formulario incluye las competencias genéricas
+-- (Categoria = 'Organizacional') más las específicas del tipo de personal (Categoria = 'DeRol').
+-- Si una competencia específica tiene el mismo nombre que una genérica, la específica la
+-- reemplaza (ej. "Trabajo en equipo" del Conductor, con comportamientos propios de rol). El 100%
+-- se reparte en partes iguales entre las categorías presentes en el formulario (si ambas existen:
+-- 50%/50%, según el formato real GHU-FOR-007), y dentro de cada categoría en partes iguales entre
+-- sus competencias. Si ninguna competencia del formulario tiene categoría, el resultado es el
+-- reparto parejo 100%/N de siempre. Misma lógica que
+-- AsignacionService.GenerarFormulariosAsync en la aplicación — mantener ambas sincronizadas.
+WITH CompetenciaFormulario AS (
+    SELECT
+        f.IdFormulario,
+        c.IdCompetencia,
+        c.Nombre,
+        c.Categoria,
+        ROW_NUMBER() OVER (
+            PARTITION BY f.IdFormulario, c.Nombre
+            ORDER BY CASE WHEN c.IdTipoPersonal IS NULL THEN 1 ELSE 0 END
+        ) AS Prioridad
+    FROM dbo.FormularioEvaluacion f
+    JOIN dbo.Competencia c
+        ON c.Activa = 1
+       AND (c.IdTipoPersonal = f.IdTipoPersonal OR c.IdTipoPersonal IS NULL)
+),
+CompetenciaElegida AS (
+    SELECT IdFormulario, IdCompetencia,
+           COALESCE(Categoria, CONCAT(N'__sin_categoria_', IdCompetencia)) AS ClaveGrupo
+    FROM CompetenciaFormulario
+    WHERE Prioridad = 1
+),
+Grupos AS (
+    SELECT IdFormulario, ClaveGrupo, COUNT(*) AS CompetenciasEnGrupo
+    FROM CompetenciaElegida
+    GROUP BY IdFormulario, ClaveGrupo
+),
+PesoPorGrupo AS (
+    SELECT IdFormulario, ClaveGrupo, CompetenciasEnGrupo,
+           100.0 / COUNT(*) OVER (PARTITION BY IdFormulario) AS PesoGrupo
+    FROM Grupos
+)
 INSERT INTO dbo.FormularioCompetencia (IdFormulario, IdCompetencia, Ponderacion)
-SELECT f.IdFormulario, c.IdCompetencia,
-       CAST(100.0 / COUNT(*) OVER (PARTITION BY f.IdFormulario) AS DECIMAL(5,2))
-FROM dbo.FormularioEvaluacion f
-JOIN dbo.Competencia c
-    ON c.Activa = 1
-   AND (c.IdTipoPersonal = f.IdTipoPersonal OR c.IdTipoPersonal IS NULL);
+SELECT ce.IdFormulario, ce.IdCompetencia,
+       CAST(pg.PesoGrupo / pg.CompetenciasEnGrupo AS DECIMAL(5,2))
+FROM CompetenciaElegida ce
+JOIN PesoPorGrupo pg ON pg.IdFormulario = ce.IdFormulario AND pg.ClaveGrupo = ce.ClaveGrupo;
 GO
 
 -- =========================================================
@@ -568,14 +629,38 @@ WHERE fc.IdFormulario = @IdFormJefeOperario;
 
 UPDATE dbo.AsignacionEvaluacion SET Estado = 'Completada' WHERE IdAsignacion IN (@IdAsigAuto, @IdAsigJefe);
 
+-- Promedio ponderado por la Ponderacion real de cada competencia dentro de su formulario (RF-06/
+-- RF-07 — sección 6), no un promedio simple: de lo contrario el peso configurado por macro-grupo
+-- no tendría ningún efecto real sobre el resultado consolidado (misma corrección aplicada en
+-- ResultadoService.ConsolidarSiCompletoAsync, en la aplicación). Para el formulario de Operario
+-- usado en este ejemplo no hay categorías configuradas, así que el peso es parejo (100%/N) y el
+-- resultado coincide con un promedio simple — la diferencia se nota en formularios como el de
+-- Conductor, que sí usa los macro-grupos al 50%/50%.
 INSERT INTO dbo.ResultadoConsolidado (CodigoEvaluado, IdPeriodo, PromedioAutoevaluacion, PromedioJefe, PromedioAscendente, PromedioGeneral, FechaConsolidacion)
 SELECT
     1013,
     @IdPeriodo2026,
-    (SELECT AVG(CAST(Calificacion AS DECIMAL(4,2))) FROM dbo.RespuestaDetalle WHERE IdRespuesta = @IdRespAuto),
-    (SELECT AVG(CAST(Calificacion AS DECIMAL(4,2))) FROM dbo.RespuestaDetalle WHERE IdRespuesta = @IdRespJefe),
+    (SELECT SUM(rd.Calificacion * fc.Ponderacion) / NULLIF(SUM(fc.Ponderacion), 0)
+     FROM dbo.RespuestaDetalle rd
+     JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormAutoOperario AND fc.IdCompetencia = rd.IdCompetencia
+     WHERE rd.IdRespuesta = @IdRespAuto),
+    (SELECT SUM(rd.Calificacion * fc.Ponderacion) / NULLIF(SUM(fc.Ponderacion), 0)
+     FROM dbo.RespuestaDetalle rd
+     JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormJefeOperario AND fc.IdCompetencia = rd.IdCompetencia
+     WHERE rd.IdRespuesta = @IdRespJefe),
     NULL,
-    (SELECT AVG(CAST(Calificacion AS DECIMAL(4,2))) FROM dbo.RespuestaDetalle WHERE IdRespuesta IN (@IdRespAuto, @IdRespJefe)),
+    (SELECT SUM(x.Calificacion * x.Ponderacion) / NULLIF(SUM(x.Ponderacion), 0)
+     FROM (
+        SELECT rd.Calificacion, fc.Ponderacion
+        FROM dbo.RespuestaDetalle rd
+        JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormAutoOperario AND fc.IdCompetencia = rd.IdCompetencia
+        WHERE rd.IdRespuesta = @IdRespAuto
+        UNION ALL
+        SELECT rd.Calificacion, fc.Ponderacion
+        FROM dbo.RespuestaDetalle rd
+        JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormJefeOperario AND fc.IdCompetencia = rd.IdCompetencia
+        WHERE rd.IdRespuesta = @IdRespJefe
+     ) AS x),
     SYSDATETIME();
 GO
 
