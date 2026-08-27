@@ -35,17 +35,18 @@ public class ItemCompetenciaViewModel
     public string? Categoria { get; set; }
     public decimal Ponderacion { get; set; }
 
-    [Range(1, 5, ErrorMessage = "La calificación debe estar entre 1 y 5.")]
-    public byte? Calificacion { get; set; }
+    [Range(0, 100, ErrorMessage = "La calificación debe estar entre 0% y 100%.")]
+    public decimal? Calificacion { get; set; }
 
     [StringLength(500)]
     public string? Comentario { get; set; }
 }
 
 /// <summary>Ítem del macro-grupo "Indicadores de Gestión" (Entregable 11 — formato real
-/// "EVALUACION DESEMPEÑO Indicadores"). A diferencia de <see cref="ItemCompetenciaViewModel"/>,
-/// no se califica de 1 a 5: se captura una Meta y un Resultado del mes, ambos en puntos
-/// porcentuales (ej. 90 = 90%).</summary>
+/// "EVALUACION DESEMPEÑO Indicadores"). Se mide con una Meta y un Resultado del mes, ambos en
+/// puntos porcentuales (ej. 90 = 90%) — la Meta es un valor FIJO del catálogo
+/// (<see cref="Entidades.IndicadorGestion.Meta"/>, Entregable 12), de solo lectura en el
+/// formulario; el evaluador solo diligencia el Resultado del mes.</summary>
 public class ItemIndicadorViewModel
 {
     public int IdIndicador { get; set; }
@@ -53,10 +54,11 @@ public class ItemIndicadorViewModel
     public string? Formula { get; set; }
     public decimal Ponderacion { get; set; }
 
-    [Range(0, 500, ErrorMessage = "La meta debe ser un valor en % (ej. 90 para 90%).")]
-    public decimal? Meta { get; set; }
+    /// <summary>Meta fija del indicador (solo lectura en el formulario) — poblada desde el
+    /// catálogo (<see cref="Entidades.IndicadorGestion.Meta"/>), no editada por el evaluador.</summary>
+    public decimal Meta { get; set; }
 
-    [Range(0, 500, ErrorMessage = "El resultado del mes debe ser un valor en % (ej. 75 para 75%).")]
+    [Range(0, 100, ErrorMessage = "El resultado del mes debe ser un valor en %, entre 0 y 100 (ej. 75 para 75%).")]
     public decimal? ResultadoMes { get; set; }
 }
 

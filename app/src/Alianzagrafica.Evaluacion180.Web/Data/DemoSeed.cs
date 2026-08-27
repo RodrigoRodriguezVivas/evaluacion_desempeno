@@ -272,12 +272,15 @@ public static class DemoSeed
         // en vez de 100% — se dejó exactamente así a propósito ("tal y como está en el Excel"),
         // en vez de normalizarlo a que sume 100%. Ver Constantes.PesoIndicadoresGestion y
         // AsignacionService.GenerarFormulariosAsync para cómo se usa este peso.
+        // Meta fija por indicador (Entregable 12, a pedido explícito del usuario): ya no la
+        // escribe el evaluador cada vez, es un valor del catálogo.
         db.IndicadoresGestion.AddRange(
             new IndicadorGestion
             {
                 Nombre = "Cultura: 5S+1",
                 Formula = "Costo de reclamos del cliente ($) facturación.",
                 Ponderacion = 33.33m,
+                Meta = 90m,
                 IdTipoPersonal = null,
                 Activa = true,
             },
@@ -286,6 +289,7 @@ public static class DemoSeed
                 Nombre = "Eficiencia",
                 Formula = "Cantidad unidades defectuosas / Cantidad unidades producidas",
                 Ponderacion = 33.33m,
+                Meta = 90m,
                 IdTipoPersonal = null,
                 Activa = true,
             },
@@ -294,6 +298,7 @@ public static class DemoSeed
                 Nombre = "Calidad",
                 Formula = "(Horas laboradas - Horas de ausentismo) / Horas totales laboradas",
                 Ponderacion = 33.33m,
+                Meta = 100m,
                 IdTipoPersonal = null,
                 Activa = true,
             },
@@ -302,6 +307,7 @@ public static class DemoSeed
                 Nombre = "Ausentismo",
                 Formula = "Rendimiento real / Rendimiento esperado",
                 Ponderacion = 33.33m,
+                Meta = 90m,
                 IdTipoPersonal = null,
                 Activa = true,
             });

@@ -126,7 +126,9 @@ public class EvaluacionesController : Controller
                 Nombre = fi.Indicador.Nombre,
                 Formula = fi.Indicador.Formula,
                 Ponderacion = fi.Ponderacion,
-                Meta = detallesPorIndicador.TryGetValue(fi.IdIndicador, out var di) ? di.Meta : null,
+                // Meta fija del catálogo (Entregable 12) — de solo lectura, no la del historial de
+                // la respuesta (que es solo una copia informativa, ver RespuestaIndicadorDetalle.Meta).
+                Meta = fi.Indicador.Meta,
                 ResultadoMes = detallesPorIndicador.TryGetValue(fi.IdIndicador, out var di2) ? di2.ResultadoMes : null,
             }).ToList(),
             OportunidadesMejora = respuesta?.OportunidadesMejora,
@@ -207,18 +209,29 @@ public class EvaluacionesController : Controller
             }
         }
 
-        // Indicadores de gestión (Entregable 11) — se guarda Meta/Resultado del mes igual que se
-        // guarda Calificacion/Comentario para las competencias, solo cuando el evaluador ya
-        // registró un Resultado del mes (Meta puede quedar sin diligenciar en un borrador).
+        // Indicadores de gestión (Entregable 11) — se guarda el Resultado del mes igual que se
+        // guarda Calificacion para las competencias, solo cuando el evaluador ya lo registró
+        // (puede quedar sin diligenciar en un borrador). La Meta es fija por indicador desde el
+        // Entregable 12 (ya no la escribe el evaluador): se toma del catálogo
+        // (IndicadorGestion.Meta), NUNCA del valor que venga en el formulario posteado, para que
+        // no dependa de lo que el navegador haya enviado.
+        var idsIndicadoresConResultado = modelo.Indicadores.Where(i => i.ResultadoMes.HasValue).Select(i => i.IdIndicador).ToList();
+        var metaPorIndicador = idsIndicadoresConResultado.Count > 0
+            ? await _db.IndicadoresGestion
+                .Where(i => idsIndicadoresConResultado.Contains(i.IdIndicador))
+                .ToDictionaryAsync(i => i.IdIndicador, i => i.Meta)
+            : new Dictionary<int, decimal>();
+
         var detallesIndicadoresExistentes = respuesta.DetallesIndicadores.ToDictionary(d => d.IdIndicador);
 
         foreach (var item in modelo.Indicadores)
         {
-            if (item.ResultadoMes is null && item.Meta is null) continue;
+            if (item.ResultadoMes is null) continue;
+            var metaCatalogo = metaPorIndicador.GetValueOrDefault(item.IdIndicador);
 
             if (detallesIndicadoresExistentes.TryGetValue(item.IdIndicador, out var detalleInd))
             {
-                detalleInd.Meta = item.Meta;
+                detalleInd.Meta = metaCatalogo;
                 detalleInd.ResultadoMes = item.ResultadoMes;
             }
             else
@@ -227,7 +240,7 @@ public class EvaluacionesController : Controller
                 {
                     IdRespuesta = respuesta.IdRespuesta,
                     IdIndicador = item.IdIndicador,
-                    Meta = item.Meta,
+                    Meta = metaCatalogo,
                     ResultadoMes = item.ResultadoMes,
                 });
             }

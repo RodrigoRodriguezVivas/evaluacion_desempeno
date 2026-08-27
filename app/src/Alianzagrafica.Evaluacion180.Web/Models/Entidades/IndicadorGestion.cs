@@ -28,6 +28,16 @@ public class IndicadorGestion
     /// </summary>
     public decimal Ponderacion { get; set; }
 
+    /// <summary>
+    /// Meta fija del indicador, en puntos porcentuales (ej. 90 = 90%) (Entregable 12 — a pedido
+    /// explícito del usuario, la Meta dejó de ser un valor que el evaluador escribe cada vez y
+    /// pasó a ser un valor fijo del catálogo, igual para todas las evaluaciones mientras no se
+    /// cambie aquí). El evaluador solo diligencia el Resultado del mes
+    /// (<see cref="RespuestaIndicadorDetalle.ResultadoMes"/>); la Meta se muestra en el
+    /// formulario de solo lectura, tomada de este campo.
+    /// </summary>
+    public decimal Meta { get; set; }
+
     public int? IdTipoPersonal { get; set; }
     public bool Activa { get; set; } = true;
 

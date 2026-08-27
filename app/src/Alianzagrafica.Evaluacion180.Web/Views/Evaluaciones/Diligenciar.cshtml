@@ -30,6 +30,12 @@
         _ => null,
     };
 
+    // Texto "88.50% (Bueno)" para mostrar un valor en % junto a su banda cualitativa
+    // (EscalaCalificacion, Entregable 12 — misma clasificación en toda la aplicación).
+    string ConBanda(decimal? porcentaje) => porcentaje is decimal p
+        ? $"{p.ToString("0.00")}% ({EscalaCalificacion.Clasificar(p)})"
+        : "—";
+
     (decimal? Subtotal, decimal PesoGrupo) CalcularSubtotal(IEnumerable<ItemCompetenciaViewModel> items)
     {
         var lista = items.ToList();
@@ -42,37 +48,30 @@
         return (subtotal, pesoGrupo);
     }
 
-    // Convierte el % de cumplimiento de un indicador de gestión a un equivalente en la escala
-    // 1-5 que usan las competencias (Entregable 11): 0% -> 1, 100% -> 5, lineal, limitado a
-    // [1,5]. Debe ser EXACTAMENTE la misma fórmula que usa ResultadoService.cs en el servidor —
-    // aquí solo se usa para la vista previa en vivo mientras se diligencia.
-    decimal EquivalenciaUnoACinco(decimal resultadoMesPuntos) =>
-        Math.Clamp(1m + 4m * (resultadoMesPuntos / 100m), 1m, 5m);
-
-    (decimal? SubtotalPorcentaje, decimal? SubtotalEquivalente, decimal PesoGrupo) CalcularSubtotalIndicadores(IEnumerable<ItemIndicadorViewModel> items)
+    (decimal? Subtotal, decimal PesoGrupo) CalcularSubtotalIndicadores(IEnumerable<ItemIndicadorViewModel> items)
     {
         var lista = items.ToList();
         var pesoGrupo = lista.Sum(i => i.Ponderacion);
         var respondidos = lista.Where(i => i.ResultadoMes.HasValue).ToList();
         var sumaPesoRespondidos = respondidos.Sum(i => i.Ponderacion);
-        if (respondidos.Count == 0 || sumaPesoRespondidos <= 0) return (null, null, pesoGrupo);
-        var subtotalPct = Math.Round(respondidos.Sum(i => i.ResultadoMes!.Value * i.Ponderacion) / sumaPesoRespondidos, 2);
-        var subtotalEq = Math.Round(EquivalenciaUnoACinco(subtotalPct), 2);
-        return (subtotalPct, subtotalEq, pesoGrupo);
+        decimal? subtotal = respondidos.Count > 0 && sumaPesoRespondidos > 0
+            ? Math.Round(respondidos.Sum(i => i.ResultadoMes!.Value * i.Ponderacion) / sumaPesoRespondidos, 2)
+            : null;
+        return (subtotal, pesoGrupo);
     }
 
-    var (_, subtotalIndicadoresEq, pesoGrupoIndicadores) = CalcularSubtotalIndicadores(Model.Indicadores);
+    var (subtotalIndicadores, pesoGrupoIndicadores) = CalcularSubtotalIndicadores(Model.Indicadores);
 
     // NOTA FINAL combinada: un único promedio ponderado sobre TODOS los ítems evaluables
-    // (competencias en escala 1-5 + indicadores convertidos a su equivalente 1-5), usando el
-    // peso absoluto ya calculado de cada uno (Ítem.Ponderacion) — misma fórmula que
-    // ResultadoService.PromedioPonderado en el servidor.
+    // (competencias e indicadores de gestión, ambos ya en la misma escala nativa 0-100% desde el
+    // Entregable 12 — sin ninguna conversión de escala), usando el peso absoluto ya calculado de
+    // cada uno (Ítem.Ponderacion) — misma fórmula que ResultadoService.PromedioPonderado en el servidor.
     decimal? notaFinal;
     {
         var valoresCompetencias = Model.Items.Where(i => i.Calificacion.HasValue)
-            .Select(i => (Valor: (decimal)i.Calificacion!.Value, Peso: i.Ponderacion));
+            .Select(i => (Valor: i.Calificacion!.Value, Peso: i.Ponderacion));
         var valoresIndicadores = Model.Indicadores.Where(i => i.ResultadoMes.HasValue)
-            .Select(i => (Valor: EquivalenciaUnoACinco(i.ResultadoMes!.Value), Peso: i.Ponderacion));
+            .Select(i => (Valor: i.ResultadoMes!.Value, Peso: i.Ponderacion));
         var todos = valoresCompetencias.Concat(valoresIndicadores).ToList();
         var sumaPeso = todos.Sum(x => x.Peso);
         notaFinal = todos.Count > 0 && sumaPeso > 0 ? Math.Round(todos.Sum(x => x.Valor * x.Peso) / sumaPeso, 2) : (decimal?)null;
@@ -93,10 +92,13 @@
 }
 else
 {
-    <p class="escala-ayuda">Escala de competencias: 1 = Insatisfactorio · 2 = En desarrollo · 3 = Cumple lo esperado · 4 = Sobresaliente · 5 = Excepcional</p>
+    <p class="escala-ayuda">
+        Escala de calificación: un valor en porcentaje, de <strong>0%</strong> (mínimo) a <strong>100%</strong> (máximo), tanto para
+        competencias como para indicadores de gestión.
+    </p>
     <p class="escala-ayuda small text-muted">
-        Equivalencia con la escala de calificación del formato interno anterior (GHU-FOR-007):
-        1-2 ≈ Deficiente (0%-59%) · 3 ≈ Aceptable (60%-79%) · 4 ≈ Bueno (80%-90%) · 5 ≈ Sobresaliente (91%-100%).
+        Equivalencia con las bandas de desempeño del formato interno GHU-FOR-007:
+        0%-59% Deficiente · 60%-79% Aceptable · 80%-90% Bueno · 91%-100% Sobresaliente.
     </p>
     @if (mostrarNotaFinal)
     {
@@ -123,9 +125,8 @@ else
                 INDICADORES DE GESTIÓN (@pesoGrupoIndicadores.ToString("0.##")% del total)
             </h2>
             <p class="escala-ayuda small text-muted">
-                Para cada indicador, registra la Meta y el Resultado del mes/periodo en porcentaje (ej. escribe
-                <strong>90</strong> para 90%). El sistema calcula el % de cumplimiento del grupo y lo convierte a
-                la escala 1-5 para combinarlo con las competencias en la NOTA FINAL.
+                La Meta de cada indicador es un valor fijo definido en el catálogo (no se edita aquí). Registra
+                únicamente el Resultado del mes/periodo en porcentaje (ej. escribe <strong>90</strong> para 90%).
             </p>
             <div class="table-responsive">
                 <table class="table tabla-competencias bg-white align-middle">
@@ -149,17 +150,11 @@ else
                                     <input type="hidden" asp-for="Indicadores[idx].Nombre" />
                                     <input type="hidden" asp-for="Indicadores[idx].Formula" />
                                     <input type="hidden" asp-for="Indicadores[idx].Ponderacion" />
+                                    <input type="hidden" asp-for="Indicadores[idx].Meta" />
                                 </td>
                                 <td class="small text-muted">@indicador.Formula</td>
                                 <td>
-                                    @if (Model.SoloLectura)
-                                    {
-                                        <span class="fw-bold">@(indicador.Meta?.ToString("0.##") ?? "—")@(indicador.Meta.HasValue ? "%" : "")</span>
-                                    }
-                                    else
-                                    {
-                                        <input type="number" step="0.01" min="0" max="500" asp-for="Indicadores[idx].Meta" class="form-control form-control-sm" data-meta="1" />
-                                    }
+                                    <span class="fw-bold">@indicador.Meta.ToString("0.##")%</span>
                                 </td>
                                 <td>
                                     @if (Model.SoloLectura)
@@ -168,7 +163,7 @@ else
                                     }
                                     else
                                     {
-                                        <input type="number" step="0.01" min="0" max="500" asp-for="Indicadores[idx].ResultadoMes" class="form-control form-control-sm" data-resultado-mes="1" />
+                                        <input type="number" step="0.01" min="0" max="100" asp-for="Indicadores[idx].ResultadoMes" class="form-control form-control-sm" data-resultado-mes="1" />
                                     }
                                 </td>
                                 <td>@indicador.Ponderacion.ToString("0.##")</td>
@@ -179,7 +174,7 @@ else
                         <tr class="table-light fw-semibold" data-subtotal-indicadores="1">
                             <td colspan="4" class="text-end">Subtotal — Indicadores de Gestión</td>
                             <td class="subtotal-valor-indicadores">
-                                @(subtotalIndicadoresEq is not null ? $"{subtotalIndicadoresEq.Value.ToString("0.00")} / 5" : "— (faltan resultados)")
+                                @(subtotalIndicadores is not null ? ConBanda(subtotalIndicadores) : "— (faltan resultados)")
                             </td>
                         </tr>
                     </tfoot>
@@ -202,7 +197,7 @@ else
                             <th style="width: 22%">Competencia</th>
                             <th>Descripción</th>
                             <th style="width: 10%">Ponderación</th>
-                            <th style="width: 12%">Calificación</th>
+                            <th style="width: 12%">Calificación (%)</th>
                             <th style="width: 24%">Comentario</th>
                         </tr>
                     </thead>
@@ -235,18 +230,11 @@ else
                                     <td>
                                         @if (Model.SoloLectura)
                                         {
-                                            <span class="fw-bold">@(Model.Items[idx].Calificacion?.ToString() ?? "—")</span>
+                                            <span class="fw-bold">@(Model.Items[idx].Calificacion is decimal c ? c.ToString("0.##") + "%" : "—")</span>
                                         }
                                         else
                                         {
-                                            <select asp-for="Items[idx].Calificacion" class="form-select form-select-sm" data-calificacion="1">
-                                                <option value="">—</option>
-                                                <option value="1">1</option>
-                                                <option value="2">2</option>
-                                                <option value="3">3</option>
-                                                <option value="4">4</option>
-                                                <option value="5">5</option>
-                                            </select>
+                                            <input type="number" step="0.01" min="0" max="100" asp-for="Items[idx].Calificacion" class="form-control form-control-sm" data-calificacion="1" placeholder="0-100" />
                                         }
                                     </td>
                                     <td>
@@ -266,7 +254,7 @@ else
                                 <tr class="table-light fw-semibold" data-subtotal-grupo="@grupo.Key">
                                     <td colspan="3" class="text-end">Subtotal — @etiquetaGrupo</td>
                                     <td colspan="2" class="subtotal-valor">
-                                        @(subtotalGrupo is not null ? $"{subtotalGrupo.Value.ToString("0.00")} / 5" : "— (faltan calificaciones)")
+                                        @(subtotalGrupo is not null ? ConBanda(subtotalGrupo) : "— (faltan calificaciones)")
                                     </td>
                                 </tr>
                             }
@@ -283,8 +271,8 @@ else
                     <tbody>
                         <tr class="table-dark text-white">
                             <td class="fw-bold">NOTA FINAL (combina todos los macro-grupos según su peso)</td>
-                            <td class="fw-bold text-end" id="nota-final-valor" style="width: 160px;">
-                                @(notaFinal is not null ? $"{notaFinal.Value.ToString("0.00")} / 5" : "— (faltan calificaciones/resultados)")
+                            <td class="fw-bold text-end" id="nota-final-valor" style="width: 220px;">
+                                @(notaFinal is not null ? ConBanda(notaFinal) : "— (faltan calificaciones/resultados)")
                             </td>
                         </tr>
                     </tbody>
@@ -348,13 +336,23 @@ else
                     // indicadores de gestión) y la nota final a medida que el evaluador va diligenciando —
                     // puramente visual/informativo; el cálculo que realmente cuenta es el que hace el
                     // servidor con los mismos datos al consolidar (ResultadoService), usando exactamente
-                    // la misma fórmula (incluida la equivalencia 1-5 de los indicadores).
+                    // la misma fórmula. Desde el Entregable 12, competencias e indicadores ya están en la
+                    // misma escala nativa (0-100%), así que no hace falta ninguna conversión aquí.
                     (function () {
-                        function equivalenciaUnoACinco(resultadoMesPuntos) {
-                            var valor = 1 + 4 * (resultadoMesPuntos / 100);
-                            if (valor < 1) valor = 1;
-                            if (valor > 5) valor = 5;
-                            return valor;
+                        var BANDAS = [
+                            { limite: 60, nombre: 'Deficiente' },
+                            { limite: 80, nombre: 'Aceptable' },
+                            { limite: 90.0000001, nombre: 'Bueno' },
+                            { limite: Infinity, nombre: 'Sobresaliente' },
+                        ];
+                        function clasificar(valor) {
+                            for (var i = 0; i < BANDAS.length; i++) {
+                                if (valor < BANDAS[i].limite) return BANDAS[i].nombre;
+                            }
+                            return 'Sobresaliente';
+                        }
+                        function conBanda(valor) {
+                            return valor.toFixed(2) + '% (' + clasificar(valor) + ')';
                         }
 
                         function recalcular() {
@@ -366,11 +364,11 @@ else
                                 var categoria = fila.getAttribute('data-categoria');
                                 if (categoria !== 'Organizacional' && categoria !== 'DeRol') return;
                                 var ponderacion = parseFloat(fila.getAttribute('data-ponderacion')) || 0;
-                                var select = fila.querySelector('select[data-calificacion]');
-                                var valor = select ? select.value : '';
+                                var input = fila.querySelector('input[data-calificacion]');
+                                var valor = input ? input.value : '';
 
                                 if (!gruposCompetencias[categoria]) gruposCompetencias[categoria] = { sumaPeso: 0, sumaPonderada: 0 };
-                                if (valor) {
+                                if (valor !== '') {
                                     gruposCompetencias[categoria].sumaPeso += ponderacion;
                                     gruposCompetencias[categoria].sumaPonderada += ponderacion * parseFloat(valor);
                                     sumaPesoTotal += ponderacion;
@@ -382,7 +380,7 @@ else
                                 var celda = document.querySelector('tr[data-subtotal-grupo="' + categoria + '"] .subtotal-valor');
                                 if (celda) {
                                     celda.textContent = g.sumaPeso > 0
-                                        ? (g.sumaPonderada / g.sumaPeso).toFixed(2) + ' / 5'
+                                        ? conBanda(g.sumaPonderada / g.sumaPeso)
                                         : '— (faltan calificaciones)';
                                 }
                             });
@@ -394,30 +392,31 @@ else
                                 var inputResultado = fila.querySelector('input[data-resultado-mes]');
                                 var valor = inputResultado ? inputResultado.value : '';
                                 if (valor !== '') {
-                                    var equivalente = equivalenciaUnoACinco(parseFloat(valor));
+                                    var numero = parseFloat(valor);
                                     indSumaPeso += ponderacion;
-                                    indSumaPonderada += ponderacion * equivalente;
+                                    indSumaPonderada += ponderacion * numero;
                                     sumaPesoTotal += ponderacion;
-                                    sumaPonderadaTotal += ponderacion * equivalente;
+                                    sumaPonderadaTotal += ponderacion * numero;
                                 }
                             });
                             var celdaIndicadores = document.querySelector('[data-subtotal-indicadores] .subtotal-valor-indicadores');
                             if (celdaIndicadores) {
                                 celdaIndicadores.textContent = indSumaPeso > 0
-                                    ? (indSumaPonderada / indSumaPeso).toFixed(2) + ' / 5'
+                                    ? conBanda(indSumaPonderada / indSumaPeso)
                                     : '— (faltan resultados)';
                             }
 
                             var notaFinalEl = document.getElementById('nota-final-valor');
                             if (notaFinalEl) {
                                 notaFinalEl.textContent = sumaPesoTotal > 0
-                                    ? (sumaPonderadaTotal / sumaPesoTotal).toFixed(2) + ' / 5'
+                                    ? conBanda(sumaPonderadaTotal / sumaPesoTotal)
                                     : '— (faltan calificaciones/resultados)';
                             }
                         }
 
-                        document.querySelectorAll('#formEvaluacion select[data-calificacion]').forEach(function (select) {
-                            select.addEventListener('change', recalcular);
+                        document.querySelectorAll('#formEvaluacion input[data-calificacion]').forEach(function (input) {
+                            input.addEventListener('input', recalcular);
+                            input.addEventListener('change', recalcular);
                         });
                         document.querySelectorAll('#formEvaluacion input[data-resultado-mes]').forEach(function (input) {
                             input.addEventListener('input', recalcular);

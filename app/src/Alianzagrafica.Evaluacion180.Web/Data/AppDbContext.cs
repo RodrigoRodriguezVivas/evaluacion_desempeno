@@ -142,6 +142,7 @@ public class AppDbContext : DbContext
             e.Property(x => x.Nombre).HasMaxLength(150).IsRequired();
             e.Property(x => x.Formula).HasMaxLength(400);
             e.Property(x => x.Ponderacion).HasPrecision(6, 3);
+            e.Property(x => x.Meta).HasPrecision(5, 2);
             e.Property(x => x.Activa).HasDefaultValue(true);
 
             e.HasOne(x => x.TipoPersonal)
@@ -271,6 +272,8 @@ public class AppDbContext : DbContext
         {
             e.ToTable("RespuestaDetalle");
             e.HasKey(x => new { x.IdRespuesta, x.IdCompetencia });
+            // Calificación en % (0-100), Entregable 12 — antes escala 1-5 (byte, sin precisión propia).
+            e.Property(x => x.Calificacion).HasPrecision(5, 2);
             e.Property(x => x.Comentario).HasMaxLength(500);
 
             e.HasOne(x => x.Respuesta)
@@ -308,10 +311,12 @@ public class AppDbContext : DbContext
         {
             e.ToTable("ResultadoConsolidado");
             e.HasKey(x => new { x.CodigoEvaluado, x.IdPeriodo });
-            e.Property(x => x.PromedioAutoevaluacion).HasPrecision(4, 2);
-            e.Property(x => x.PromedioJefe).HasPrecision(4, 2);
-            e.Property(x => x.PromedioAscendente).HasPrecision(4, 2);
-            e.Property(x => x.PromedioGeneral).HasPrecision(4, 2);
+            // Precision (5,2) para admitir hasta 100.00 — antes (4,2) alcanzaba para la escala
+            // 1-5, pero desde el Entregable 12 estos promedios son % (0-100).
+            e.Property(x => x.PromedioAutoevaluacion).HasPrecision(5, 2);
+            e.Property(x => x.PromedioJefe).HasPrecision(5, 2);
+            e.Property(x => x.PromedioAscendente).HasPrecision(5, 2);
+            e.Property(x => x.PromedioGeneral).HasPrecision(5, 2);
 
             e.HasOne(x => x.Evaluado)
                 .WithMany()

@@ -32,9 +32,10 @@ public class ResultadoService : IResultadoService
             .ToListAsync();
 
         // Indicadores de gestión (Entregable 11 — macro-grupo "Indicadores de Gestión", formato
-        // real "EVALUACION DESEMPEÑO Indicadores"). No se califican de 1 a 5 sino con un
-        // Resultado del mes en % — para combinarlos en la misma nota final que las competencias
-        // se convierten a un equivalente en escala 1-5 (ver EquivalenciaUnoACinco más abajo).
+        // real "EVALUACION DESEMPEÑO Indicadores"). Se miden con un Resultado del mes en % —
+        // desde el Entregable 12 las competencias también se califican en % (0-100), así que
+        // ambos tipos de ítem ya están en la misma escala nativa y se combinan directamente, sin
+        // ninguna conversión intermedia.
         var detallesIndicadores = await _db.RespuestaIndicadorDetalles
             .Where(d => idsRespuesta.Contains(d.IdRespuesta))
             .ToListAsync();
@@ -73,19 +74,15 @@ public class ResultadoService : IResultadoService
             return 1m; // sin ponderación configurada: cuenta como peso igual al resto (fallback defensivo)
         }
 
-        // Convierte el % de cumplimiento de un indicador de gestión a un equivalente en la
-        // escala 1-5 que usan las competencias (Entregable 11, decisión de diseño confirmada con
-        // el usuario): 0% -> 1, 100% -> 5, de forma lineal, limitado a [1,5] para no romper la
-        // escala del resto de la nota aunque el indicador supere el 100%.
-        decimal EquivalenciaUnoACinco(decimal resultadoMesPuntos) =>
-            Math.Clamp(1m + 4m * (resultadoMesPuntos / 100m), 1m, 5m);
-
+        // Promedio ponderado combinado en % (0-100): competencias e indicadores de gestión ya
+        // están en la misma escala nativa desde el Entregable 12, así que se combinan
+        // directamente (Σ valor×peso / Σ peso), sin ninguna conversión de escala intermedia.
         decimal? PromedioPonderado(IEnumerable<RespuestaDetalle> items, IEnumerable<RespuestaIndicadorDetalle> itemsIndicadores)
         {
-            var listaCompetencias = items.Select(d => (Valor: (decimal)d.Calificacion, Peso: ObtenerPonderacion(d)));
+            var listaCompetencias = items.Select(d => (Valor: d.Calificacion, Peso: ObtenerPonderacion(d)));
             var listaIndicadores = itemsIndicadores
                 .Where(d => d.ResultadoMes.HasValue)
-                .Select(d => (Valor: EquivalenciaUnoACinco(d.ResultadoMes!.Value), Peso: ObtenerPonderacionIndicador(d)));
+                .Select(d => (Valor: d.ResultadoMes!.Value, Peso: ObtenerPonderacionIndicador(d)));
             var lista = listaCompetencias.Concat(listaIndicadores).ToList();
             var sumaPesos = lista.Sum(x => x.Peso);
             if (lista.Count == 0 || sumaPesos <= 0) return null;

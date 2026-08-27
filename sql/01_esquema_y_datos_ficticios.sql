@@ -128,14 +128,20 @@ CREATE TABLE dbo.Competencia (
 GO
 
 -- ---- Indicadores de gestión (Entregable 11 — macro-grupo "Indicadores de Gestión", formato
--- real "EVALUACION DESEMPEÑO Indicadores" de Alianzagrafica). A diferencia de Competencia (que
--- el evaluador califica de 1 a 5), un indicador se mide con una Meta y un Resultado del mes, en
--- puntos porcentuales — ver dbo.RespuestaIndicadorDetalle más abajo.
+-- real "EVALUACION DESEMPEÑO Indicadores" de Alianzagrafica). Un indicador se mide con una Meta
+-- y un Resultado del mes, ambos en puntos porcentuales — ver dbo.RespuestaIndicadorDetalle más
+-- abajo. Desde el Entregable 12 las competencias (dbo.Competencia) también se califican en % (ya
+-- no de 1 a 5), así que ambos tipos de ítem comparten la misma escala nativa 0-100.
 CREATE TABLE dbo.IndicadorGestion (
     IdIndicador    INT IDENTITY(1,1)  NOT NULL,
     Nombre         NVARCHAR(150)      NOT NULL,
     Formula        NVARCHAR(400)      NULL,           -- descripción de la fórmula/definición del indicador
     Ponderacion    DECIMAL(6,3)       NOT NULL,        -- peso DENTRO del grupo (no del total), en % (ej. 33.33)
+    -- Meta fija del indicador, en puntos porcentuales (ej. 90 = 90%) (Entregable 12 — a pedido
+    -- explícito del usuario, la Meta dejó de ser un valor que el evaluador escribe cada vez y
+    -- pasó a ser un valor fijo del catálogo, igual para todas las evaluaciones mientras no se
+    -- cambie aquí; ver Alianzagrafica.Evaluacion180.Web.Models.Entidades.IndicadorGestion.Meta).
+    Meta           DECIMAL(5,2)       NOT NULL,
     IdTipoPersonal INT                NULL,            -- NULL = indicador genérico (aplica a todos)
     Activa         BIT                NOT NULL CONSTRAINT DF_IndicadorGestion_Activa DEFAULT (1),
     CONSTRAINT PK_IndicadorGestion PRIMARY KEY (IdIndicador),
@@ -231,20 +237,26 @@ CREATE TABLE dbo.RespuestaEvaluacion (
 );
 GO
 
+-- Calificacion: % (0-100), NO 1-5 desde el Entregable 12 (a pedido explícito del usuario: "Todas
+-- las calificaciones en todos los aspectos que hace el evaluador son en porcentajes, en donde la
+-- calificacion minima es 0 y la maxima 100"). Antes era TINYINT 1-5; ver
+-- Alianzagrafica.Evaluacion180.Web.Models.Entidades.RespuestaEvaluacion.RespuestaDetalle.Calificacion.
 CREATE TABLE dbo.RespuestaDetalle (
     IdRespuesta   INT           NOT NULL,
     IdCompetencia INT           NOT NULL,
-    Calificacion  TINYINT       NOT NULL,
+    Calificacion  DECIMAL(5,2)  NOT NULL,
     Comentario    NVARCHAR(500) NULL,
     CONSTRAINT PK_RespuestaDetalle PRIMARY KEY (IdRespuesta, IdCompetencia),
     CONSTRAINT FK_Detalle_Respuesta FOREIGN KEY (IdRespuesta) REFERENCES dbo.RespuestaEvaluacion (IdRespuesta),
     CONSTRAINT FK_Detalle_Competencia FOREIGN KEY (IdCompetencia) REFERENCES dbo.Competencia (IdCompetencia),
-    CONSTRAINT CK_Detalle_Calificacion CHECK (Calificacion BETWEEN 1 AND 5)
+    CONSTRAINT CK_Detalle_Calificacion CHECK (Calificacion BETWEEN 0 AND 100)
 );
 GO
 
--- Entregable 11: respuesta de un indicador de gestión — Meta y Resultado del mes en % en vez de
--- una calificación de 1 a 5 (ver dbo.IndicadorGestion).
+-- Entregable 11: respuesta de un indicador de gestión — Meta y Resultado del mes en %, igual que
+-- Calificacion arriba (ver dbo.IndicadorGestion). Desde el Entregable 12, Meta aquí es solo una
+-- FOTO/snapshot del valor fijo del catálogo (dbo.IndicadorGestion.Meta) tomado al guardar la
+-- respuesta — el evaluador ya no la escribe, solo diligencia ResultadoMes.
 CREATE TABLE dbo.RespuestaIndicadorDetalle (
     IdRespuesta  INT           NOT NULL,
     IdIndicador  INT           NOT NULL,
@@ -257,13 +269,15 @@ CREATE TABLE dbo.RespuestaIndicadorDetalle (
 GO
 
 -- ---- Resultado consolidado por evaluado y periodo ----
+-- Promedio* en DECIMAL(5,2): antes DECIMAL(4,2) alcanzaba porque la escala tope era 5.00; desde
+-- el Entregable 12 la escala nativa es 0-100.00 y necesita un dígito entero más.
 CREATE TABLE dbo.ResultadoConsolidado (
     CodigoEvaluado          INT           NOT NULL,
     IdPeriodo               INT           NOT NULL,
-    PromedioAutoevaluacion  DECIMAL(4,2)  NULL,
-    PromedioJefe            DECIMAL(4,2)  NULL,
-    PromedioAscendente      DECIMAL(4,2)  NULL,
-    PromedioGeneral         DECIMAL(4,2)  NULL,
+    PromedioAutoevaluacion  DECIMAL(5,2)  NULL,
+    PromedioJefe            DECIMAL(5,2)  NULL,
+    PromedioAscendente      DECIMAL(5,2)  NULL,
+    PromedioGeneral         DECIMAL(5,2)  NULL,
     FechaConsolidacion      DATETIME2(0)  NULL,
     CONSTRAINT PK_ResultadoConsolidado PRIMARY KEY (CodigoEvaluado, IdPeriodo),
     CONSTRAINT FK_Resultado_Empleado FOREIGN KEY (CodigoEvaluado) REFERENCES dbo.Empleado (CodigoEmpleado),
@@ -515,11 +529,13 @@ GO
 -- otras tres filas, suman ~133.33% dentro del grupo — decisión explícita del usuario (mantener
 -- exactamente igual que el Excel, sin normalizar), ver Constantes.PesoIndicadoresGestion y la
 -- nota en la sección 6 de este script.
-INSERT INTO dbo.IndicadorGestion (Nombre, Formula, Ponderacion, IdTipoPersonal) VALUES
-    (N'Cultura: 5S+1', N'Costo de reclamos del cliente ($) facturación.', 33.33, NULL),
-    (N'Eficiencia', N'Cantidad unidades defectuosas / Cantidad unidades producidas', 33.33, NULL),
-    (N'Calidad', N'(Horas laboradas - Horas de ausentismo) / Horas totales laboradas', 33.33, NULL),
-    (N'Ausentismo', N'Rendimiento real / Rendimiento esperado', 33.33, NULL);
+-- Meta (Entregable 12 — a pedido explícito del usuario, valores fijos): Ausentismo = 90,
+-- Calidad = 100, "Cultura: 5S+1" = 90, Eficiencia = 90. Igual que DemoSeed.cs (aplicación).
+INSERT INTO dbo.IndicadorGestion (Nombre, Formula, Ponderacion, Meta, IdTipoPersonal) VALUES
+    (N'Cultura: 5S+1', N'Costo de reclamos del cliente ($) facturación.', 33.33, 90.00, NULL),
+    (N'Eficiencia', N'Cantidad unidades defectuosas / Cantidad unidades producidas', 33.33, 90.00, NULL),
+    (N'Calidad', N'(Horas laboradas - Horas de ausentismo) / Horas totales laboradas', 33.33, 100.00, NULL),
+    (N'Ausentismo', N'Rendimiento real / Rendimiento esperado', 33.33, 90.00, NULL);
 GO
 
 -- =========================================================
@@ -759,23 +775,30 @@ DECLARE @IdFormJefeOperario INT = (
     WHERE f.IdPeriodo = @IdPeriodo2026 AND f.TipoRelacion = 'Jefe' AND tp.Nombre = N'Operario'
 );
 
--- Autoevaluación: Wilson se califica con 4 en todas sus competencias
+-- Autoevaluación: Wilson se califica con 85% en todas sus competencias (Entregable 12 — escala
+-- nativa 0-100%, ya no 1-5; 85% cae en la banda "Bueno" de EscalaCalificacion).
 INSERT INTO dbo.RespuestaDetalle (IdRespuesta, IdCompetencia, Calificacion, Comentario)
-SELECT @IdRespAuto, fc.IdCompetencia, 4, N'Autoevaluación — ejemplo de datos ficticios'
+SELECT @IdRespAuto, fc.IdCompetencia, 85.00, N'Autoevaluación — ejemplo de datos ficticios'
 FROM dbo.FormularioCompetencia fc
 WHERE fc.IdFormulario = @IdFormAutoOperario;
 
--- Evaluación del jefe: Laura califica a Wilson con 3 en todas sus competencias
+-- Evaluación del jefe: Laura califica a Wilson con 60% en todas sus competencias. Nota: el
+-- PromedioJefe consolidado más abajo NO queda en 60% porque combina esto con los indicadores de
+-- gestión (que pesan más dentro del formulario y tienen valores altos, 78-95%) — el resultado
+-- verificado con un harness aparte (fuera de este script) da ~75.7%, banda "Aceptable" de
+-- EscalaCalificacion, todavía claramente por debajo del ~86.4% de la autoevaluación.
 INSERT INTO dbo.RespuestaDetalle (IdRespuesta, IdCompetencia, Calificacion, Comentario)
-SELECT @IdRespJefe, fc.IdCompetencia, 3, N'Evaluación del jefe — ejemplo de datos ficticios'
+SELECT @IdRespJefe, fc.IdCompetencia, 60.00, N'Evaluación del jefe — ejemplo de datos ficticios'
 FROM dbo.FormularioCompetencia fc
 WHERE fc.IdFormulario = @IdFormJefeOperario;
 
 -- Indicadores de gestión (Entregable 11) — Meta y Resultado del mes son datos operativos
 -- objetivos del área, no una apreciación subjetiva del evaluador; por eso se usan los mismos
--- valores de ejemplo (ficticios) tanto en la autoevaluación como en la evaluación del jefe.
+-- valores de ejemplo (ficticios) tanto en la autoevaluación como en la evaluación del jefe. Meta
+-- se toma del valor fijo del catálogo (dbo.IndicadorGestion.Meta, Entregable 12) — no se inventa
+-- un valor distinto aquí, igual que hace el controlador de la aplicación al guardar.
 INSERT INTO dbo.RespuestaIndicadorDetalle (IdRespuesta, IdIndicador, Meta, ResultadoMes)
-SELECT @IdRespAuto, fi.IdIndicador, 90.00,
+SELECT @IdRespAuto, i.IdIndicador, i.Meta,
        CASE i.Nombre
            WHEN N'Cultura: 5S+1' THEN 95.00
            WHEN N'Eficiencia'    THEN 85.00
@@ -787,7 +810,7 @@ JOIN dbo.IndicadorGestion i ON i.IdIndicador = fi.IdIndicador
 WHERE fi.IdFormulario = @IdFormAutoOperario;
 
 INSERT INTO dbo.RespuestaIndicadorDetalle (IdRespuesta, IdIndicador, Meta, ResultadoMes)
-SELECT @IdRespJefe, fi.IdIndicador, 90.00,
+SELECT @IdRespJefe, i.IdIndicador, i.Meta,
        CASE i.Nombre
            WHEN N'Cultura: 5S+1' THEN 95.00
            WHEN N'Eficiencia'    THEN 85.00
@@ -801,49 +824,42 @@ WHERE fi.IdFormulario = @IdFormJefeOperario;
 UPDATE dbo.AsignacionEvaluacion SET Estado = 'Completada' WHERE IdAsignacion IN (@IdAsigAuto, @IdAsigJefe);
 
 -- Promedio ponderado por la Ponderacion real de cada ítem dentro de su formulario (RF-06/RF-07
--- ampliado en el Entregable 11 — sección 6), combinando competencias (escala 1-5 directa) e
--- indicadores de gestión (Meta/Resultado del mes en %, convertidos a escala 1-5 mediante la
--- misma fórmula que ResultadoService.EquivalenciaUnoACinco de la aplicación:
--- CLAMP(1 + 4*(ResultadoMes/100), 1, 5) — 0%→1, 100%→5, acotado para no desbordar la escala
--- combinada). La suma se autonormaliza dividiendo por SUM(Ponderacion) de todos los ítems
--- presentes (no un denominador fijo de 100), por lo que el resultado queda siempre acotado en
--- [1,5] aun cuando las ponderaciones de los indicadores dentro de su grupo sumen ~133% (decisión
--- explícita del usuario, ver sección 5 de este script). Para el formulario de Operario usado en
--- este ejemplo las competencias no tienen categoría configurada como caso especial, pero sí
--- están presentes las tres claves de macro-grupo (Organizacional/DeRol/IndicadoresGestion), así
--- que se aplican los pesos fijos 20%/30%/50% de la sección 6.
+-- ampliado en el Entregable 11 — sección 6), combinando competencias e indicadores de gestión.
+-- Desde el Entregable 12 ambos tipos de ítem ya están en la misma escala nativa % (0-100), así
+-- que se combinan DIRECTAMENTE (Σ valor×peso / Σ peso), sin ninguna conversión de escala
+-- intermedia (antes había una equivalencia a escala 1-5 aquí; ver ResultadoService.PromedioPonderado
+-- en la aplicación, que sigue exactamente esta misma fórmula simplificada). La suma se
+-- autonormaliza dividiendo por SUM(Ponderacion) de todos los ítems presentes (no un denominador
+-- fijo de 100), por lo que el resultado queda siempre acotado en [0,100] aun cuando las
+-- ponderaciones de los indicadores dentro de su grupo sumen ~133% (decisión explícita del
+-- usuario, ver sección 5 de este script). Para el formulario de Operario usado en este ejemplo
+-- las competencias no tienen categoría configurada como caso especial, pero sí están presentes
+-- las tres claves de macro-grupo (Organizacional/DeRol/IndicadoresGestion), así que se aplican
+-- los pesos fijos 20%/30%/50% de la sección 6.
 INSERT INTO dbo.ResultadoConsolidado (CodigoEvaluado, IdPeriodo, PromedioAutoevaluacion, PromedioJefe, PromedioAscendente, PromedioGeneral, FechaConsolidacion)
 SELECT
     1013,
     @IdPeriodo2026,
     (SELECT SUM(x.Valor * x.Ponderacion) / NULLIF(SUM(x.Ponderacion), 0)
      FROM (
-        SELECT CAST(rd.Calificacion AS DECIMAL(9,4)) AS Valor, fc.Ponderacion
+        SELECT rd.Calificacion AS Valor, fc.Ponderacion
         FROM dbo.RespuestaDetalle rd
         JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormAutoOperario AND fc.IdCompetencia = rd.IdCompetencia
         WHERE rd.IdRespuesta = @IdRespAuto
         UNION ALL
-        SELECT
-            CASE WHEN 1 + 4 * (rid.ResultadoMes / 100.0) < 1 THEN 1
-                 WHEN 1 + 4 * (rid.ResultadoMes / 100.0) > 5 THEN 5
-                 ELSE 1 + 4 * (rid.ResultadoMes / 100.0) END,
-            fi.Ponderacion
+        SELECT rid.ResultadoMes, fi.Ponderacion
         FROM dbo.RespuestaIndicadorDetalle rid
         JOIN dbo.FormularioIndicador fi ON fi.IdFormulario = @IdFormAutoOperario AND fi.IdIndicador = rid.IdIndicador
         WHERE rid.IdRespuesta = @IdRespAuto AND rid.ResultadoMes IS NOT NULL
      ) AS x),
     (SELECT SUM(x.Valor * x.Ponderacion) / NULLIF(SUM(x.Ponderacion), 0)
      FROM (
-        SELECT CAST(rd.Calificacion AS DECIMAL(9,4)) AS Valor, fc.Ponderacion
+        SELECT rd.Calificacion AS Valor, fc.Ponderacion
         FROM dbo.RespuestaDetalle rd
         JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormJefeOperario AND fc.IdCompetencia = rd.IdCompetencia
         WHERE rd.IdRespuesta = @IdRespJefe
         UNION ALL
-        SELECT
-            CASE WHEN 1 + 4 * (rid.ResultadoMes / 100.0) < 1 THEN 1
-                 WHEN 1 + 4 * (rid.ResultadoMes / 100.0) > 5 THEN 5
-                 ELSE 1 + 4 * (rid.ResultadoMes / 100.0) END,
-            fi.Ponderacion
+        SELECT rid.ResultadoMes, fi.Ponderacion
         FROM dbo.RespuestaIndicadorDetalle rid
         JOIN dbo.FormularioIndicador fi ON fi.IdFormulario = @IdFormJefeOperario AND fi.IdIndicador = rid.IdIndicador
         WHERE rid.IdRespuesta = @IdRespJefe AND rid.ResultadoMes IS NOT NULL
@@ -851,30 +867,22 @@ SELECT
     NULL,
     (SELECT SUM(x.Valor * x.Ponderacion) / NULLIF(SUM(x.Ponderacion), 0)
      FROM (
-        SELECT CAST(rd.Calificacion AS DECIMAL(9,4)) AS Valor, fc.Ponderacion
+        SELECT rd.Calificacion AS Valor, fc.Ponderacion
         FROM dbo.RespuestaDetalle rd
         JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormAutoOperario AND fc.IdCompetencia = rd.IdCompetencia
         WHERE rd.IdRespuesta = @IdRespAuto
         UNION ALL
-        SELECT CAST(rd.Calificacion AS DECIMAL(9,4)), fc.Ponderacion
+        SELECT rd.Calificacion, fc.Ponderacion
         FROM dbo.RespuestaDetalle rd
         JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormJefeOperario AND fc.IdCompetencia = rd.IdCompetencia
         WHERE rd.IdRespuesta = @IdRespJefe
         UNION ALL
-        SELECT
-            CASE WHEN 1 + 4 * (rid.ResultadoMes / 100.0) < 1 THEN 1
-                 WHEN 1 + 4 * (rid.ResultadoMes / 100.0) > 5 THEN 5
-                 ELSE 1 + 4 * (rid.ResultadoMes / 100.0) END,
-            fi.Ponderacion
+        SELECT rid.ResultadoMes, fi.Ponderacion
         FROM dbo.RespuestaIndicadorDetalle rid
         JOIN dbo.FormularioIndicador fi ON fi.IdFormulario = @IdFormAutoOperario AND fi.IdIndicador = rid.IdIndicador
         WHERE rid.IdRespuesta = @IdRespAuto AND rid.ResultadoMes IS NOT NULL
         UNION ALL
-        SELECT
-            CASE WHEN 1 + 4 * (rid.ResultadoMes / 100.0) < 1 THEN 1
-                 WHEN 1 + 4 * (rid.ResultadoMes / 100.0) > 5 THEN 5
-                 ELSE 1 + 4 * (rid.ResultadoMes / 100.0) END,
-            fi.Ponderacion
+        SELECT rid.ResultadoMes, fi.Ponderacion
         FROM dbo.RespuestaIndicadorDetalle rid
         JOIN dbo.FormularioIndicador fi ON fi.IdFormulario = @IdFormJefeOperario AND fi.IdIndicador = rid.IdIndicador
         WHERE rid.IdRespuesta = @IdRespJefe AND rid.ResultadoMes IS NOT NULL
