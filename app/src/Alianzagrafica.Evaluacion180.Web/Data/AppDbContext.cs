@@ -121,6 +121,7 @@ public class AppDbContext : DbContext
             e.Property(x => x.IdCompetencia).ValueGeneratedOnAdd();
             e.Property(x => x.Nombre).HasMaxLength(150).IsRequired();
             e.Property(x => x.Descripcion).HasMaxLength(400);
+            e.Property(x => x.Categoria).HasMaxLength(30);
             e.Property(x => x.Activa).HasDefaultValue(true);
 
             e.HasOne(x => x.TipoPersonal)

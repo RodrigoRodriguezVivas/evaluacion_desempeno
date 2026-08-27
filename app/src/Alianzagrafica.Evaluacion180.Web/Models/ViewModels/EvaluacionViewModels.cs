@@ -32,6 +32,7 @@ public class ItemCompetenciaViewModel
     public int IdCompetencia { get; set; }
     public string Nombre { get; set; } = string.Empty;
     public string? Descripcion { get; set; }
+    public string? Categoria { get; set; }
     public decimal Ponderacion { get; set; }
 
     [Range(1, 5, ErrorMessage = "La calificación debe estar entre 1 y 5.")]

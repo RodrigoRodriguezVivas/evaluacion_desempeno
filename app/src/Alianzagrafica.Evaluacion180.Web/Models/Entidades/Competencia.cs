@@ -9,6 +9,19 @@ public class Competencia
     public int? IdTipoPersonal { get; set; }
     public bool Activa { get; set; } = true;
 
+    /// <summary>
+    /// Macro-grupo de ponderación al que pertenece esta competencia dentro de un formulario
+    /// (RF-07): <see cref="Constantes.CategoriaOrganizacional"/> o
+    /// <see cref="Constantes.CategoriaDeRol"/>. Null = sin categoría (la competencia se pondera
+    /// como un grupo propio de 1, comportamiento histórico de reparto parejo). El peso de cada
+    /// categoría presente en un formulario se reparte 100%/N entre las categorías presentes, y
+    /// dentro de cada una en partes iguales entre sus competencias — ver
+    /// <see cref="Services.AsignacionService"/>. Basado en el formato real GHU-FOR-007 de
+    /// Alianzagrafica: "EVALUACION DE COMPETENCIAS ORGANIZACIONALES" y "EVALUACION DE
+    /// COMPETENCIAS DE ROL", cada una con peso del 50% (ver Entregable 5 / ajuste posterior).
+    /// </summary>
+    public string? Categoria { get; set; }
+
     public TipoPersonal? TipoPersonal { get; set; }
     public ICollection<FormularioCompetencia> FormularioCompetencias { get; set; } = new List<FormularioCompetencia>();
 

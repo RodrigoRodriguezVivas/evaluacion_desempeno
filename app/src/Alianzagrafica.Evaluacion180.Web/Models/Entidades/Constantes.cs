@@ -36,6 +36,10 @@ public static class Constantes
     public const string RespuestaBorrador = "Borrador";
     public const string RespuestaEnviada = "Enviada";
 
+    // Competencia.Categoria (macro-grupo de ponderación, RF-07 — ver GHU-FOR-007)
+    public const string CategoriaOrganizacional = "Organizacional";
+    public const string CategoriaDeRol = "DeRol";
+
     // Nombres de tipos de personal (deben coincidir exactamente con la tabla TipoPersonal)
     public const string TipoDirectivo = "Directivo";
     public const string TipoMandoMedio = "Mando medio";

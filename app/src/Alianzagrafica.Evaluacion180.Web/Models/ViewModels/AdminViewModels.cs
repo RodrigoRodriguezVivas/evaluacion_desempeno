@@ -37,6 +37,13 @@ public class CompetenciaListaItemViewModel
     public string Nombre { get; set; } = string.Empty;
     public string? Descripcion { get; set; }
     public string Grupo { get; set; } = string.Empty;
+    public string? Categoria { get; set; }
+    public string CategoriaTexto => Categoria switch
+    {
+        Entidades.Constantes.CategoriaOrganizacional => "Organizacional",
+        Entidades.Constantes.CategoriaDeRol => "De Rol",
+        _ => "Sin categoría",
+    };
     public bool Activa { get; set; }
 }
 
@@ -53,6 +60,9 @@ public class CrearCompetenciaViewModel
 
     [Display(Name = "Tipo de personal (vacío = genérica, aplica a todos)")]
     public int? IdTipoPersonal { get; set; }
+
+    [Display(Name = "Macro-grupo de ponderación (RF-07)")]
+    public string? Categoria { get; set; }
 
     public List<TipoPersonalOpcionViewModel> TiposDisponibles { get; set; } = new();
 }

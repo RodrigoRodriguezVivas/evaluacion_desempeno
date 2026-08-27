@@ -16,6 +16,7 @@
             <tr>
                 <th>Nombre</th>
                 <th>Grupo</th>
+                <th>Macro-grupo (peso)</th>
                 <th>Descripción</th>
                 <th>Estado</th>
                 <th class="text-end">Acciones</th>
@@ -27,6 +28,7 @@
                 <tr>
                     <td>@c.Nombre</td>
                     <td><span class="badge badge-relacion">@c.Grupo</span></td>
+                    <td><span class="small text-muted">@c.CategoriaTexto</span></td>
                     <td class="small text-muted">@c.Descripcion</td>
                     <td>
                         <span class="badge @(c.Activa ? "badge-completada" : "bg-secondary")">@(c.Activa ? "Activa" : "Inactiva")</span>

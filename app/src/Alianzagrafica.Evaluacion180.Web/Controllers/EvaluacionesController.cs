@@ -76,7 +76,10 @@ public class EvaluacionesController : Controller
             ? await _db.FormularioCompetencias
                 .Include(fc => fc.Competencia)
                 .Where(fc => fc.IdFormulario == idFormulario)
-                .OrderBy(fc => fc.Competencia.Nombre)
+                // Ordenar por categoría primero para que los macro-grupos (Organizacional / De
+                // Rol) queden agrupados de forma contigua al mostrar el formulario.
+                .OrderBy(fc => fc.Competencia.Categoria)
+                .ThenBy(fc => fc.Competencia.Nombre)
                 .ToListAsync()
             : new List<FormularioCompetencia>();
 
@@ -100,6 +103,7 @@ public class EvaluacionesController : Controller
                 IdCompetencia = fc.IdCompetencia,
                 Nombre = fc.Competencia.Nombre,
                 Descripcion = fc.Competencia.Descripcion,
+                Categoria = fc.Competencia.Categoria,
                 Ponderacion = fc.Ponderacion,
                 Calificacion = detallesPorCompetencia.TryGetValue(fc.IdCompetencia, out var d) ? d.Calificacion : null,
                 Comentario = detallesPorCompetencia.TryGetValue(fc.IdCompetencia, out var d2) ? d2.Comentario : null,

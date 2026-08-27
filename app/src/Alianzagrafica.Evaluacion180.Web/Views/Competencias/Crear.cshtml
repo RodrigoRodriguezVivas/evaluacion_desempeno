@@ -27,6 +27,19 @@
             }
         </select>
     </div>
+    <div class="mb-3">
+        <label asp-for="Categoria" class="form-label"></label>
+        <select asp-for="Categoria" class="form-select">
+            <option value="">Sin categoría (reparto parejo entre todas las competencias del formulario)</option>
+            <option value="Organizacional">Organizacional (EVALUACION DE COMPETENCIAS ORGANIZACIONALES)</option>
+            <option value="DeRol">De Rol (EVALUACION DE COMPETENCIAS DE ROL)</option>
+        </select>
+        <span class="form-text">
+            Si al menos una competencia de un formulario tiene macro-grupo, el 100% se reparte en
+            partes iguales entre los grupos presentes (ej. 50%/50%), y dentro de cada grupo en
+            partes iguales entre sus competencias.
+        </span>
+    </div>
     <button type="submit" class="btn btn-primary">Guardar</button>
     <a class="btn btn-link" asp-action="Index">Cancelar</a>
 </form>

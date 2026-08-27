@@ -30,6 +30,7 @@ public class CompetenciasController : Controller
             Nombre = c.Nombre,
             Descripcion = c.Descripcion,
             Grupo = c.GrupoDescripcion,
+            Categoria = c.Categoria,
             Activa = c.Activa,
         }).ToList();
 
@@ -62,6 +63,7 @@ public class CompetenciasController : Controller
             Nombre = modelo.Nombre,
             Descripcion = modelo.Descripcion,
             IdTipoPersonal = modelo.IdTipoPersonal,
+            Categoria = string.IsNullOrWhiteSpace(modelo.Categoria) ? null : modelo.Categoria,
             Activa = true,
         });
         await _db.SaveChangesAsync();

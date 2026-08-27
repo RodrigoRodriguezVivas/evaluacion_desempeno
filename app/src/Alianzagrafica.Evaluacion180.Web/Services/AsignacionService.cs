@@ -52,19 +52,40 @@ public class AsignacionService : IAsignacionService
 
                 var competenciasFormulario = competencias
                     .Where(c => c.IdTipoPersonal == tipo.IdTipoPersonal || c.IdTipoPersonal == null)
+                    // Una competencia propia del tipo de personal reemplaza a la genérica del
+                    // mismo nombre (ej. "Trabajo en equipo" tiene una versión propia para
+                    // Conductor, con comportamientos de rol distintos — GHU-FOR-007, sección
+                    // "COMPETENCIAS DE ROL"), para que no se evalúe dos veces la misma competencia.
+                    .GroupBy(c => c.Nombre, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.OrderByDescending(c => c.IdTipoPersonal.HasValue).First())
                     .ToList();
 
                 if (competenciasFormulario.Count > 0)
                 {
-                    var ponderacion = Math.Round(100m / competenciasFormulario.Count, 2);
-                    foreach (var comp in competenciasFormulario)
+                    // Ponderación por macro-grupo (RF-07, formato real GHU-FOR-007): el 100% se
+                    // reparte en partes iguales entre las categorías presentes en el formulario
+                    // (ej. "Organizacional" y "DeRol" → 50%/50%), y dentro de cada categoría el
+                    // peso se reparte en partes iguales entre sus competencias. Una competencia
+                    // sin categoría forma su propio grupo de 1 (comportamiento histórico: si
+                    // ninguna competencia tiene categoría, el resultado es el reparto parejo
+                    // 100%/N de siempre).
+                    var grupos = competenciasFormulario
+                        .GroupBy(c => c.Categoria ?? $"__sin_categoria_{c.IdCompetencia}")
+                        .ToList();
+                    var pesoPorGrupo = Math.Round(100m / grupos.Count, 4);
+
+                    foreach (var grupo in grupos)
                     {
-                        _db.FormularioCompetencias.Add(new FormularioCompetencia
+                        var pesoPorCompetencia = Math.Round(pesoPorGrupo / grupo.Count(), 2);
+                        foreach (var comp in grupo)
                         {
-                            IdFormulario = formulario.IdFormulario,
-                            IdCompetencia = comp.IdCompetencia,
-                            Ponderacion = ponderacion,
-                        });
+                            _db.FormularioCompetencias.Add(new FormularioCompetencia
+                            {
+                                IdFormulario = formulario.IdFormulario,
+                                IdCompetencia = comp.IdCompetencia,
+                                Ponderacion = pesoPorCompetencia,
+                            });
+                        }
                     }
                 }
 

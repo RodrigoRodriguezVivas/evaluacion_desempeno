@@ -122,6 +122,16 @@ public static class DemoSeed
         // (nombres de trabajadores ni calificaciones) de ese archivo — solo la estructura de
         // competencias y sus definiciones, que son las mismas para cualquier colaborador del
         // cargo, no información personal.
+        //
+        // Categoria (ajuste posterior, sobre la hoja de ejemplo real "J.LUCUMI" del mismo
+        // archivo): las competencias se agrupan en dos macro-grupos de 50% cada uno —
+        // "EVALUACION DE COMPETENCIAS ORGANIZACIONALES" (Constantes.CategoriaOrganizacional) y
+        // "EVALUACION DE COMPETENCIAS DE ROL" (Constantes.CategoriaDeRol). En esa hoja de
+        // ejemplo, "Trabajo en equipo" para el Conductor está SOLO en el grupo "de Rol" (con
+        // comportamientos propios de coordinación con el equipo de despachos), no en el grupo
+        // organizacional — por eso el Conductor tiene su propia competencia "Trabajo en equipo"
+        // (más abajo), distinta de la genérica que sigue aplicando igual al resto de tipos de
+        // personal. Ver AsignacionService.GenerarFormulariosAsync para cómo se calcula el peso.
         db.Competencias.AddRange(
             // -- Organizacionales (aplican a todos los tipos de personal) --
             new Competencia
@@ -129,6 +139,7 @@ public static class DemoSeed
                 Nombre = "Adherencia a normas y políticas organizacionales",
                 Descripcion = "Capacidad para adaptarse a las normas y políticas de la organización, mostrando compromiso al conocerlas, entenderlas y aplicarlas.",
                 IdTipoPersonal = null,
+                Categoria = Constantes.CategoriaOrganizacional,
                 Activa = true,
             },
             new Competencia
@@ -136,6 +147,7 @@ public static class DemoSeed
                 Nombre = "Compromiso con la calidad del trabajo",
                 Descripcion = "Capacidad para actuar con minuciosidad, velocidad y sentido de urgencia y tomar decisiones para alcanzar los objetivos del puesto de trabajo, del área u organizacionales, con altos niveles de desempeño.",
                 IdTipoPersonal = null,
+                Categoria = Constantes.CategoriaOrganizacional,
                 Activa = true,
             },
             new Competencia
@@ -143,6 +155,7 @@ public static class DemoSeed
                 Nombre = "Trabajo en equipo",
                 Descripcion = "Habilidad para interactuar con las personas, escuchar activamente y ser generador de ideas que faciliten la obtención de resultados exitosos, enmarcados en el beneficio común, por encima de los intereses personales.",
                 IdTipoPersonal = null,
+                Categoria = Constantes.CategoriaOrganizacional,
                 Activa = true,
             },
             new Competencia
@@ -150,6 +163,7 @@ public static class DemoSeed
                 Nombre = "Eficiencia y productividad",
                 Descripcion = "Habilidad para dirigir las propias acciones y/o las de otros de forma que agreguen valor a la organización, alcanzando los objetivos, cumpliendo con el tiempo disponible y con la calidad requerida.",
                 IdTipoPersonal = null,
+                Categoria = Constantes.CategoriaOrganizacional,
                 Activa = true,
             },
             // -- Específicas por tipo de personal --
@@ -158,6 +172,7 @@ public static class DemoSeed
                 Nombre = "Visión estratégica",
                 Descripcion = "Capacidad para definir el rumbo de la organización a mediano y largo plazo, anticipando cambios del entorno y alineando los recursos disponibles.",
                 IdTipoPersonal = directivo.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             },
             new Competencia
@@ -165,6 +180,7 @@ public static class DemoSeed
                 Nombre = "Liderazgo de equipos",
                 Descripcion = "Capacidad para dirigir, motivar y desarrollar al equipo a cargo, garantizando el cumplimiento de los objetivos del área.",
                 IdTipoPersonal = mandoMedio.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             },
             new Competencia
@@ -172,6 +188,7 @@ public static class DemoSeed
                 Nombre = "Precisión en el manejo de información",
                 Descripcion = "Capacidad para procesar y registrar información administrativa con exactitud, evitando errores que afecten los procesos internos.",
                 IdTipoPersonal = administrativo.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             },
             new Competencia
@@ -179,6 +196,7 @@ public static class DemoSeed
                 Nombre = "Calidad en el proceso productivo",
                 Descripcion = "Capacidad para ejecutar el proceso productivo cumpliendo los estándares de calidad y minimizando unidades defectuosas.",
                 IdTipoPersonal = operario.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             },
             new Competencia
@@ -186,6 +204,7 @@ public static class DemoSeed
                 Nombre = "Cumplimiento de normas de seguridad",
                 Descripcion = "Capacidad para aplicar de forma consistente las normas de seguridad industrial y el uso adecuado de los elementos de protección personal.",
                 IdTipoPersonal = auxiliarPlanta.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             },
             // -- Competencias de rol del Conductor (de la sección "COMPETENCIAS DE ROL" del
@@ -195,6 +214,15 @@ public static class DemoSeed
                 Nombre = "Orientación al cliente",
                 Descripcion = "Capacidad de generar valor agregado y diferenciador a los clientes internos y externos, indagando, conociendo y resolviendo oportunamente sus necesidades.",
                 IdTipoPersonal = conductor.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
+                Activa = true,
+            },
+            new Competencia
+            {
+                Nombre = "Trabajo en equipo",
+                Descripcion = "Habilidad para interactuar con las personas, escuchar activamente y ser generador de ideas que faciliten resultados exitosos, coordinando con el coordinador y el auxiliar de despachos las actividades de cargue y recogida, por encima de los intereses individuales.",
+                IdTipoPersonal = conductor.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             },
             new Competencia
@@ -202,6 +230,7 @@ public static class DemoSeed
                 Nombre = "Orientación al logro",
                 Descripcion = "Gran capacidad para el seguimiento y velocidad en la consecución de los objetivos propuestos, con facilidad y oportunidad para la toma de decisiones que favorezcan a toda la organización.",
                 IdTipoPersonal = conductor.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             },
             new Competencia
@@ -209,6 +238,7 @@ public static class DemoSeed
                 Nombre = "Atención al detalle",
                 Descripcion = "Manejo eficaz y prolongado de información detallada, procurando eliminar el error y las duplicidades en el proceso de despacho y entrega.",
                 IdTipoPersonal = conductor.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             },
             new Competencia
@@ -216,6 +246,7 @@ public static class DemoSeed
                 Nombre = "Sentido de la urgencia",
                 Descripcion = "Capacidad para percibir la urgencia real de determinadas tareas y actuar con celeridad para alcanzar su realización en plazos breves de tiempo.",
                 IdTipoPersonal = conductor.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             },
             new Competencia
@@ -223,6 +254,7 @@ public static class DemoSeed
                 Nombre = "Escucha activa",
                 Descripcion = "Escucha activa de las instrucciones recibidas, preguntando hasta que los mensajes estén totalmente claros, y estando alerta a los cambios de la operación.",
                 IdTipoPersonal = conductor.IdTipoPersonal,
+                Categoria = Constantes.CategoriaDeRol,
                 Activa = true,
             });
         await db.SaveChangesAsync();
