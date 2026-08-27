@@ -181,9 +181,10 @@ else
                 </table>
             </div>
             <p class="escala-ayuda small text-muted">
-                La suma de las ponderaciones individuales de los indicadores puede no dar exactamente 100% dentro
-                del grupo (en este formato, 33.33% × 4 = 133.32%) — se dejó tal como está en el formato de origen;
-                por eso el peso efectivo de este grupo en la NOTA FINAL puede ser algo mayor a su peso nominal.
+                La columna "Ponderación" muestra el peso de cada indicador YA normalizado dentro del grupo, de
+                forma que el subtotal de "Indicadores de Gestión" siempre sume exactamente su @pesoGrupoIndicadores.ToString("0.##")%
+                nominal del total — los cuatro indicadores mantienen entre sí el mismo peso relativo del formato
+                de origen (33.33% cada uno).
             </p>
         }
 

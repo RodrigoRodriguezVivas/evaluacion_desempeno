@@ -120,14 +120,25 @@ public class AsignacionService : IAsignacionService
                     if (indicadoresFormulario.Count > 0)
                     {
                         var pesoGrupoIndicadores = PesoDelGrupo(Constantes.CategoriaIndicadoresGestion);
+                        // Cada indicador conserva su peso RELATIVO dentro del grupo tal como viene
+                        // configurado en el catálogo (ej. 33.33% cada uno, columna
+                        // IndicadorGestion.Ponderacion) — no se reparte en partes iguales, a
+                        // diferencia de las competencias. Hasta el Entregable 13, ese % se aplicaba
+                        // directamente sobre 100 sin normalizar, así que si las Ponderacion del
+                        // catálogo no sumaban exactamente 100 (como en este catálogo, que suma
+                        // ~133.33%), el peso EFECTIVO del grupo dentro de la nota final terminaba
+                        // siendo distinto del peso nominal fijo (50% Indicadores / 30% De Rol / 20%
+                        // Organizacional) — el usuario detectó que los macro-grupos no quedaban bien
+                        // ponderados por esto. Corregido dividiendo por la suma real de las
+                        // Ponderacion de los indicadores presentes en el formulario, en vez de por
+                        // 100 fijo: así el grupo siempre suma exactamente su peso nominal
+                        // (pesoGrupoIndicadores), preservando el peso relativo entre indicadores.
+                        var sumaPonderacionIndicadores = indicadoresFormulario.Sum(i => i.Ponderacion);
                         foreach (var ind in indicadoresFormulario)
                         {
-                            // A diferencia de las competencias (reparto parejo dentro del grupo),
-                            // cada indicador conserva su propia ponderación intra-grupo tal como
-                            // viene configurada (ej. 33.33% cada uno) — no se reparte en partes
-                            // iguales ni se normaliza a que sume 100%, a propósito (ver
-                            // IndicadorGestion.Ponderacion).
-                            var pesoAbsoluto = Math.Round(pesoGrupoIndicadores * (ind.Ponderacion / 100m), 2);
+                            var pesoAbsoluto = sumaPonderacionIndicadores > 0
+                                ? Math.Round(pesoGrupoIndicadores * (ind.Ponderacion / sumaPonderacionIndicadores), 2)
+                                : 0m;
                             _db.FormularioIndicadores.Add(new FormularioIndicador
                             {
                                 IdFormulario = formulario.IdFormulario,

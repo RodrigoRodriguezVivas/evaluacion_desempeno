@@ -575,9 +575,11 @@ GO
 -- total, según el formato real "EVALUACION DESEMPEÑO Indicadores" de Alianzagrafica). Genéricos
 -- (IdTipoPersonal = NULL, aplican a todo el personal), igual que en DemoSeed.cs (aplicación).
 -- Las ponderaciones (33.33% cada uno) están tal como figuran en el Excel origen y, junto con las
--- otras tres filas, suman ~133.33% dentro del grupo — decisión explícita del usuario (mantener
--- exactamente igual que el Excel, sin normalizar), ver Constantes.PesoIndicadoresGestion y la
--- nota en la sección 6 de este script.
+-- otras tres filas, suman ~133.33% dentro del catálogo (no 100%) — se mantienen así porque
+-- reflejan el peso RELATIVO entre los cuatro indicadores tal como viene del Excel. Desde el
+-- Entregable 14, al generar cada formulario esa Ponderacion relativa se normaliza para que el
+-- grupo "Indicadores de Gestión" siempre sume exactamente su peso nominal fijo (50% del total) —
+-- ver Constantes.PesoIndicadoresGestion y la nota en la sección 6 de este script.
 -- Meta (Entregable 12 — a pedido explícito del usuario, valores fijos): Ausentismo = 90,
 -- Calidad = 100, "Cultura: 5S+1" = 90, Eficiencia = 90. Igual que DemoSeed.cs (aplicación).
 INSERT INTO dbo.IndicadorGestion (Nombre, Formula, Ponderacion, Meta, IdTipoPersonal) VALUES
@@ -733,16 +735,30 @@ JOIN @PesoPorGrupo pg ON pg.IdFormulario = ce.IdFormulario AND pg.ClaveGrupo = c
 
 -- Indicadores de gestión: cada indicador recibe el peso ABSOLUTO resultante de aplicar su propia
 -- Ponderacion (% dentro del grupo, ej. 33.33) al peso del grupo 'IndicadoresGestion' — NO reparto
--- parejo entre indicadores, a diferencia de las competencias. Igual que
--- AsignacionService.GenerarFormulariosAsync (pesoAbsoluto = pesoGrupoIndicadores * Ponderacion/100).
+-- parejo entre indicadores, a diferencia de las competencias. Hasta el Entregable 13, ese % se
+-- aplicaba directamente sobre 100 (Ponderacion/100.0) sin normalizar: como las 4 Ponderacion del
+-- catálogo suman ~133.33% (no 100%), el peso EFECTIVO del grupo dentro de la nota final terminaba
+-- siendo distinto de su peso nominal fijo (50%) — el usuario detectó que los tres macro-grupos no
+-- quedaban bien ponderados (Indicadores no sumaba realmente 50%). Corregido (Entregable 14)
+-- dividiendo por la suma REAL de las Ponderacion de los indicadores presentes en el formulario en
+-- vez de por 100 fijo, para que el grupo siempre sume exactamente su peso nominal, preservando el
+-- peso relativo entre indicadores. Igual que AsignacionService.GenerarFormulariosAsync
+-- (pesoAbsoluto = pesoGrupoIndicadores * Ponderacion/sumaPonderacionIndicadores).
 INSERT INTO dbo.FormularioIndicador (IdFormulario, IdIndicador, Ponderacion)
 SELECT f.IdFormulario, i.IdIndicador,
-       CAST(pg.PesoGrupo * (i.Ponderacion / 100.0) AS DECIMAL(5,2))
+       CAST(pg.PesoGrupo * (i.Ponderacion / spi.SumaPonderacion) AS DECIMAL(5,2))
 FROM dbo.FormularioEvaluacion f
 JOIN dbo.IndicadorGestion i
     ON i.Activa = 1
    AND (i.IdTipoPersonal = f.IdTipoPersonal OR i.IdTipoPersonal IS NULL)
-JOIN @PesoPorGrupo pg ON pg.IdFormulario = f.IdFormulario AND pg.ClaveGrupo = N'IndicadoresGestion';
+JOIN @PesoPorGrupo pg ON pg.IdFormulario = f.IdFormulario AND pg.ClaveGrupo = N'IndicadoresGestion'
+CROSS APPLY (
+    SELECT SUM(i2.Ponderacion) AS SumaPonderacion
+    FROM dbo.IndicadorGestion i2
+    WHERE i2.Activa = 1
+      AND (i2.IdTipoPersonal = f.IdTipoPersonal OR i2.IdTipoPersonal IS NULL)
+) spi
+WHERE spi.SumaPonderacion > 0;
 GO
 
 -- =========================================================
@@ -847,8 +863,11 @@ WHERE fc.IdFormulario = @IdFormAutoOperario;
 -- Evaluación del jefe: Laura califica a Wilson con 60% en todas sus competencias. Nota: el
 -- PromedioJefe consolidado más abajo NO queda en 60% porque combina esto con los indicadores de
 -- gestión (que pesan más dentro del formulario y tienen valores altos, 78-95%) — el resultado
--- verificado con un harness aparte (fuera de este script) da ~75.7%, banda "Aceptable" de
--- EscalaCalificacion, todavía claramente por debajo del ~86.4% de la autoevaluación.
+-- verificado con un harness aparte (fuera de este script) da ~73.75%, banda "Aceptable" de
+-- EscalaCalificacion, todavía claramente por debajo del ~86.25% de la autoevaluación. (Valores
+-- actualizados en el Entregable 14 tras normalizar el peso de los indicadores de gestión dentro
+-- de su grupo — antes de esa corrección daban ~75.7%/~86.4%, con el grupo de indicadores pesando
+-- efectivamente ~66.7% en vez de su 50% nominal.)
 INSERT INTO dbo.RespuestaDetalle (IdRespuesta, IdCompetencia, Calificacion, Comentario)
 SELECT @IdRespJefe, fc.IdCompetencia, 60.00, N'Evaluación del jefe — ejemplo de datos ficticios'
 FROM dbo.FormularioCompetencia fc
@@ -898,9 +917,11 @@ UPDATE dbo.AsignacionEvaluacion SET Estado = 'Completada' WHERE IdAsignacion IN 
 -- intermedia (antes había una equivalencia a escala 1-5 aquí; ver ResultadoService.PromedioPonderado
 -- en la aplicación, que sigue exactamente esta misma fórmula simplificada). La suma se
 -- autonormaliza dividiendo por SUM(Ponderacion) de todos los ítems presentes (no un denominador
--- fijo de 100), por lo que el resultado queda siempre acotado en [0,100] aun cuando las
--- ponderaciones de los indicadores dentro de su grupo sumen ~133% (decisión explícita del
--- usuario, ver sección 5 de este script). Para el formulario de Operario usado en este ejemplo
+-- fijo de 100), por lo que el resultado queda siempre acotado en [0,100]. Desde el Entregable 14,
+-- el peso de cada indicador dentro de FormularioIndicador.Ponderacion ya viene normalizado en la
+-- sección 6 de este script para que el grupo "IndicadoresGestion" siempre sume su 50% nominal
+-- (aunque la Ponderacion del catálogo, columna 5, siga sumando ~133% entre los cuatro indicadores
+-- — ver sección 5). Para el formulario de Operario usado en este ejemplo
 -- las competencias no tienen categoría configurada como caso especial, pero sí están presentes
 -- las tres claves de macro-grupo (Organizacional/DeRol/IndicadoresGestion), así que se aplican
 -- los pesos fijos 20%/30%/50% de la sección 6.
