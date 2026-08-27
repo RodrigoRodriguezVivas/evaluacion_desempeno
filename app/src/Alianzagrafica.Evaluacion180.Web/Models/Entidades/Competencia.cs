@@ -25,5 +25,11 @@ public class Competencia
     public TipoPersonal? TipoPersonal { get; set; }
     public ICollection<FormularioCompetencia> FormularioCompetencias { get; set; } = new List<FormularioCompetencia>();
 
+    /// <summary>Comportamientos observables que componen esta competencia (Entregable 13 —
+    /// columna "COMPORTAMIENTOS" del Excel origen). La "NOTA FINAL" de la competencia es el
+    /// promedio de estos comportamientos, no un valor calificado directamente — ver
+    /// <see cref="Comportamiento"/> y <see cref="RespuestaDetalle.Calificacion"/>.</summary>
+    public ICollection<Comportamiento> Comportamientos { get; set; } = new List<Comportamiento>();
+
     public string GrupoDescripcion => IdTipoPersonal is null ? "Genérica (todos)" : TipoPersonal?.Nombre ?? string.Empty;
 }
