@@ -127,6 +127,22 @@ CREATE TABLE dbo.Competencia (
 );
 GO
 
+-- ---- Indicadores de gestión (Entregable 11 — macro-grupo "Indicadores de Gestión", formato
+-- real "EVALUACION DESEMPEÑO Indicadores" de Alianzagrafica). A diferencia de Competencia (que
+-- el evaluador califica de 1 a 5), un indicador se mide con una Meta y un Resultado del mes, en
+-- puntos porcentuales — ver dbo.RespuestaIndicadorDetalle más abajo.
+CREATE TABLE dbo.IndicadorGestion (
+    IdIndicador    INT IDENTITY(1,1)  NOT NULL,
+    Nombre         NVARCHAR(150)      NOT NULL,
+    Formula        NVARCHAR(400)      NULL,           -- descripción de la fórmula/definición del indicador
+    Ponderacion    DECIMAL(6,3)       NOT NULL,        -- peso DENTRO del grupo (no del total), en % (ej. 33.33)
+    IdTipoPersonal INT                NULL,            -- NULL = indicador genérico (aplica a todos)
+    Activa         BIT                NOT NULL CONSTRAINT DF_IndicadorGestion_Activa DEFAULT (1),
+    CONSTRAINT PK_IndicadorGestion PRIMARY KEY (IdIndicador),
+    CONSTRAINT FK_IndicadorGestion_TipoPersonal FOREIGN KEY (IdTipoPersonal) REFERENCES dbo.TipoPersonal (IdTipoPersonal)
+);
+GO
+
 -- ---- Periodos de evaluación ----
 CREATE TABLE dbo.PeriodoEvaluacion (
     IdPeriodo     INT IDENTITY(1,1)  NOT NULL,
@@ -166,6 +182,17 @@ CREATE TABLE dbo.FormularioCompetencia (
 );
 GO
 
+-- Entregable 11: análoga a FormularioCompetencia, pero para indicadores de gestión.
+CREATE TABLE dbo.FormularioIndicador (
+    IdFormulario INT           NOT NULL,
+    IdIndicador  INT           NOT NULL,
+    Ponderacion  DECIMAL(5,2)  NOT NULL CONSTRAINT DF_FormIndicador_Ponderacion DEFAULT (0),
+    CONSTRAINT PK_FormularioIndicador PRIMARY KEY (IdFormulario, IdIndicador),
+    CONSTRAINT FK_FormInd_Formulario FOREIGN KEY (IdFormulario) REFERENCES dbo.FormularioEvaluacion (IdFormulario),
+    CONSTRAINT FK_FormInd_Indicador FOREIGN KEY (IdIndicador) REFERENCES dbo.IndicadorGestion (IdIndicador)
+);
+GO
+
 -- ---- Asignación evaluador -> evaluado ----
 CREATE TABLE dbo.AsignacionEvaluacion (
     IdAsignacion     INT IDENTITY(1,1)  NOT NULL,
@@ -188,10 +215,15 @@ GO
 
 -- ---- Respuestas de evaluación ----
 CREATE TABLE dbo.RespuestaEvaluacion (
-    IdRespuesta  INT IDENTITY(1,1)  NOT NULL,
-    IdAsignacion INT                NOT NULL,
-    FechaEnvio   DATETIME2(0)       NULL,
-    Estado       VARCHAR(10)        NOT NULL CONSTRAINT DF_Respuesta_Estado DEFAULT ('Borrador'),
+    IdRespuesta         INT IDENTITY(1,1)  NOT NULL,
+    IdAsignacion        INT                NOT NULL,
+    FechaEnvio          DATETIME2(0)       NULL,
+    Estado              VARCHAR(10)        NOT NULL CONSTRAINT DF_Respuesta_Estado DEFAULT ('Borrador'),
+    -- Sección "COMPROMISOS" (Entregable 11 — formato real "EVALUACION DESEMPEÑO Indicadores"):
+    -- tres campos de texto libre diligenciados entre evaluador y evaluado.
+    OportunidadesMejora NVARCHAR(2000)     NULL,
+    Compromisos         NVARCHAR(2000)     NULL,
+    RevisionCompromisos NVARCHAR(2000)     NULL,
     CONSTRAINT PK_RespuestaEvaluacion PRIMARY KEY (IdRespuesta),
     CONSTRAINT UQ_Respuesta_Asignacion UNIQUE (IdAsignacion),
     CONSTRAINT FK_Respuesta_Asignacion FOREIGN KEY (IdAsignacion) REFERENCES dbo.AsignacionEvaluacion (IdAsignacion),
@@ -208,6 +240,19 @@ CREATE TABLE dbo.RespuestaDetalle (
     CONSTRAINT FK_Detalle_Respuesta FOREIGN KEY (IdRespuesta) REFERENCES dbo.RespuestaEvaluacion (IdRespuesta),
     CONSTRAINT FK_Detalle_Competencia FOREIGN KEY (IdCompetencia) REFERENCES dbo.Competencia (IdCompetencia),
     CONSTRAINT CK_Detalle_Calificacion CHECK (Calificacion BETWEEN 1 AND 5)
+);
+GO
+
+-- Entregable 11: respuesta de un indicador de gestión — Meta y Resultado del mes en % en vez de
+-- una calificación de 1 a 5 (ver dbo.IndicadorGestion).
+CREATE TABLE dbo.RespuestaIndicadorDetalle (
+    IdRespuesta  INT           NOT NULL,
+    IdIndicador  INT           NOT NULL,
+    Meta         DECIMAL(6,2)  NULL,
+    ResultadoMes DECIMAL(6,2)  NULL,
+    CONSTRAINT PK_RespuestaIndicadorDetalle PRIMARY KEY (IdRespuesta, IdIndicador),
+    CONSTRAINT FK_DetalleInd_Respuesta FOREIGN KEY (IdRespuesta) REFERENCES dbo.RespuestaEvaluacion (IdRespuesta),
+    CONSTRAINT FK_DetalleInd_Indicador FOREIGN KEY (IdIndicador) REFERENCES dbo.IndicadorGestion (IdIndicador)
 );
 GO
 
@@ -408,9 +453,10 @@ GO
 -- =========================================================
 
 -- Genéricas (IdTipoPersonal = NULL, aplican a todo el personal). Categoria = 'Organizacional'
--- (RF-07 — macro-grupo "EVALUACION DE COMPETENCIAS ORGANIZACIONALES", peso 50% del total,
--- según el formato real GHU-FOR-007 de Alianzagrafica — ver Entregable 5 y el ajuste posterior
--- de agrupación/ponderación).
+-- (RF-07 — macro-grupo "EVALUACION DE COMPETENCIAS ORGANIZACIONALES", peso 20% del total desde
+-- el Entregable 11 —antes 50%—, según el formato real GHU-FOR-007 / "EVALUACION DESEMPEÑO
+-- Indicadores" de Alianzagrafica — ver Entregable 5 y los ajustes posteriores de
+-- agrupación/ponderación).
 INSERT INTO dbo.Competencia (Nombre, IdTipoPersonal, Categoria) VALUES
     (N'Compromiso y responsabilidad', NULL, N'Organizacional'),
     (N'Trabajo en equipo', NULL, N'Organizacional'),
@@ -420,7 +466,7 @@ INSERT INTO dbo.Competencia (Nombre, IdTipoPersonal, Categoria) VALUES
 GO
 
 -- Específicas por tipo de personal. Categoria = 'DeRol' (macro-grupo "EVALUACION DE
--- COMPETENCIAS DE ROL", peso 50% del total).
+-- COMPETENCIAS DE ROL", peso 30% del total desde el Entregable 11 —antes 50%—).
 INSERT INTO dbo.Competencia (Nombre, IdTipoPersonal, Categoria)
 SELECT N'Liderazgo y desarrollo de personas', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
 UNION ALL SELECT N'Visión estratégica', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
@@ -462,6 +508,20 @@ UNION ALL SELECT N'Sentido de la urgencia', IdTipoPersonal, N'DeRol' FROM dbo.Ti
 UNION ALL SELECT N'Escucha activa', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor';
 GO
 
+-- Indicadores de gestión (Entregable 11 — macro-grupo "INDICADORES DE GESTIÓN", peso 50% del
+-- total, según el formato real "EVALUACION DESEMPEÑO Indicadores" de Alianzagrafica). Genéricos
+-- (IdTipoPersonal = NULL, aplican a todo el personal), igual que en DemoSeed.cs (aplicación).
+-- Las ponderaciones (33.33% cada uno) están tal como figuran en el Excel origen y, junto con las
+-- otras tres filas, suman ~133.33% dentro del grupo — decisión explícita del usuario (mantener
+-- exactamente igual que el Excel, sin normalizar), ver Constantes.PesoIndicadoresGestion y la
+-- nota en la sección 6 de este script.
+INSERT INTO dbo.IndicadorGestion (Nombre, Formula, Ponderacion, IdTipoPersonal) VALUES
+    (N'Cultura: 5S+1', N'Costo de reclamos del cliente ($) facturación.', 33.33, NULL),
+    (N'Eficiencia', N'Cantidad unidades defectuosas / Cantidad unidades producidas', 33.33, NULL),
+    (N'Calidad', N'(Horas laboradas - Horas de ausentismo) / Horas totales laboradas', 33.33, NULL),
+    (N'Ausentismo', N'Rendimiento real / Rendimiento esperado', 33.33, NULL);
+GO
+
 -- =========================================================
 -- 6. PERIODO DE EVALUACIÓN 2026 + FORMULARIOS
 -- =========================================================
@@ -489,16 +549,91 @@ WHERE p.Nombre = N'Evaluación de Desempeño 2026'
   AND tp.PermiteEvaluacionAscendente = 1;
 GO
 
--- Ponderación (RF-06/RF-07): cada formulario incluye las competencias genéricas
--- (Categoria = 'Organizacional') más las específicas del tipo de personal (Categoria = 'DeRol').
--- Si una competencia específica tiene el mismo nombre que una genérica, la específica la
--- reemplaza (ej. "Trabajo en equipo" del Conductor, con comportamientos propios de rol). El 100%
--- se reparte en partes iguales entre las categorías presentes en el formulario (si ambas existen:
--- 50%/50%, según el formato real GHU-FOR-007), y dentro de cada categoría en partes iguales entre
--- sus competencias. Si ninguna competencia del formulario tiene categoría, el resultado es el
--- reparto parejo 100%/N de siempre. Misma lógica que
--- AsignacionService.GenerarFormulariosAsync en la aplicación — mantener ambas sincronizadas.
-WITH CompetenciaFormulario AS (
+-- Ponderación (RF-06/RF-07 ampliado en el Entregable 11): cada formulario incluye las
+-- competencias genéricas (Categoria = 'Organizacional') más las específicas del tipo de personal
+-- (Categoria = 'DeRol'), y además todos los indicadores de gestión activos aplicables (macro-
+-- grupo 'IndicadoresGestion', formato real "EVALUACION DESEMPEÑO Indicadores"). Si una
+-- competencia específica tiene el mismo nombre que una genérica, la específica la reemplaza (ej.
+-- "Trabajo en equipo" del Conductor). Cuando las TRES claves de macro-grupo conocidas están
+-- presentes en el formulario (Organizacional + DeRol + IndicadoresGestion, que es el caso de
+-- todos los formularios de esta demo porque los 4 indicadores son genéricos), se usan los pesos
+-- FIJOS del Entregable 11: IndicadoresGestion 50%, DeRol 30%, Organizacional 20%. En cualquier
+-- otro caso (por compatibilidad hacia atrás, ej. si en el futuro se desactivan todos los
+-- indicadores) se conserva el reparto parejo histórico 100%/N entre las claves presentes. Dentro
+-- de "Organizacional"/"DeRol" el peso del grupo se reparte en partes iguales entre sus
+-- competencias; dentro de "IndicadoresGestion" cada indicador recibe su propia Ponderacion
+-- configurada (no reparto parejo — ver el segundo INSERT más abajo). Misma lógica que
+-- AsignacionService.GenerarFormulariosAsync en la aplicación — mantener sincronizadas.
+DECLARE @PesoPorGrupo TABLE (
+    IdFormulario INT          NOT NULL,
+    ClaveGrupo   NVARCHAR(50) NOT NULL,
+    PesoGrupo    DECIMAL(9,4) NOT NULL,
+    PRIMARY KEY (IdFormulario, ClaveGrupo)
+);
+
+;WITH CompetenciaFormulario AS (
+    SELECT
+        f.IdFormulario,
+        c.IdCompetencia,
+        c.Categoria,
+        ROW_NUMBER() OVER (
+            PARTITION BY f.IdFormulario, c.Nombre
+            ORDER BY CASE WHEN c.IdTipoPersonal IS NULL THEN 1 ELSE 0 END
+        ) AS Prioridad
+    FROM dbo.FormularioEvaluacion f
+    JOIN dbo.Competencia c
+        ON c.Activa = 1
+       AND (c.IdTipoPersonal = f.IdTipoPersonal OR c.IdTipoPersonal IS NULL)
+),
+ClaveCompetencia AS (
+    SELECT DISTINCT IdFormulario,
+           COALESCE(Categoria, CONCAT(N'__sin_categoria_', IdCompetencia)) AS ClaveGrupo
+    FROM CompetenciaFormulario
+    WHERE Prioridad = 1
+),
+ClaveIndicador AS (
+    SELECT DISTINCT f.IdFormulario, N'IndicadoresGestion' AS ClaveGrupo
+    FROM dbo.FormularioEvaluacion f
+    JOIN dbo.IndicadorGestion i
+        ON i.Activa = 1
+       AND (i.IdTipoPersonal = f.IdTipoPersonal OR i.IdTipoPersonal IS NULL)
+),
+ClavesPresentes AS (
+    SELECT IdFormulario, ClaveGrupo FROM ClaveCompetencia
+    UNION
+    SELECT IdFormulario, ClaveGrupo FROM ClaveIndicador
+),
+ConteoClaves AS (
+    SELECT IdFormulario, COUNT(*) AS TotalClaves
+    FROM ClavesPresentes
+    GROUP BY IdFormulario
+),
+UsaPesosFijos AS (
+    -- Formularios donde están presentes EXACTAMENTE las tres claves conocidas (ni de más ni de
+    -- menos) — mismo umbral que AsignacionService.GenerarFormulariosAsync (usaPesosFijos).
+    SELECT cp.IdFormulario
+    FROM ClavesPresentes cp
+    JOIN ConteoClaves cc ON cc.IdFormulario = cp.IdFormulario
+    WHERE cp.ClaveGrupo IN (N'Organizacional', N'DeRol', N'IndicadoresGestion')
+    GROUP BY cp.IdFormulario
+    HAVING COUNT(DISTINCT cp.ClaveGrupo) = 3 AND MIN(cc.TotalClaves) = 3
+)
+INSERT INTO @PesoPorGrupo (IdFormulario, ClaveGrupo, PesoGrupo)
+SELECT cp.IdFormulario, cp.ClaveGrupo,
+       CASE
+           WHEN upf.IdFormulario IS NOT NULL THEN
+               CASE cp.ClaveGrupo
+                   WHEN N'IndicadoresGestion' THEN 50.0
+                   WHEN N'Organizacional'     THEN 20.0
+                   WHEN N'DeRol'              THEN 30.0
+               END
+           ELSE 100.0 / cc.TotalClaves
+       END
+FROM ClavesPresentes cp
+JOIN ConteoClaves cc ON cc.IdFormulario = cp.IdFormulario
+LEFT JOIN UsaPesosFijos upf ON upf.IdFormulario = cp.IdFormulario;
+
+;WITH CompetenciaFormulario AS (
     SELECT
         f.IdFormulario,
         c.IdCompetencia,
@@ -519,21 +654,30 @@ CompetenciaElegida AS (
     FROM CompetenciaFormulario
     WHERE Prioridad = 1
 ),
-Grupos AS (
+CompetenciasPorGrupo AS (
     SELECT IdFormulario, ClaveGrupo, COUNT(*) AS CompetenciasEnGrupo
     FROM CompetenciaElegida
     GROUP BY IdFormulario, ClaveGrupo
-),
-PesoPorGrupo AS (
-    SELECT IdFormulario, ClaveGrupo, CompetenciasEnGrupo,
-           100.0 / COUNT(*) OVER (PARTITION BY IdFormulario) AS PesoGrupo
-    FROM Grupos
 )
 INSERT INTO dbo.FormularioCompetencia (IdFormulario, IdCompetencia, Ponderacion)
 SELECT ce.IdFormulario, ce.IdCompetencia,
-       CAST(pg.PesoGrupo / pg.CompetenciasEnGrupo AS DECIMAL(5,2))
+       CAST(pg.PesoGrupo / cg.CompetenciasEnGrupo AS DECIMAL(5,2))
 FROM CompetenciaElegida ce
-JOIN PesoPorGrupo pg ON pg.IdFormulario = ce.IdFormulario AND pg.ClaveGrupo = ce.ClaveGrupo;
+JOIN CompetenciasPorGrupo cg ON cg.IdFormulario = ce.IdFormulario AND cg.ClaveGrupo = ce.ClaveGrupo
+JOIN @PesoPorGrupo pg ON pg.IdFormulario = ce.IdFormulario AND pg.ClaveGrupo = ce.ClaveGrupo;
+
+-- Indicadores de gestión: cada indicador recibe el peso ABSOLUTO resultante de aplicar su propia
+-- Ponderacion (% dentro del grupo, ej. 33.33) al peso del grupo 'IndicadoresGestion' — NO reparto
+-- parejo entre indicadores, a diferencia de las competencias. Igual que
+-- AsignacionService.GenerarFormulariosAsync (pesoAbsoluto = pesoGrupoIndicadores * Ponderacion/100).
+INSERT INTO dbo.FormularioIndicador (IdFormulario, IdIndicador, Ponderacion)
+SELECT f.IdFormulario, i.IdIndicador,
+       CAST(pg.PesoGrupo * (i.Ponderacion / 100.0) AS DECIMAL(5,2))
+FROM dbo.FormularioEvaluacion f
+JOIN dbo.IndicadorGestion i
+    ON i.Activa = 1
+   AND (i.IdTipoPersonal = f.IdTipoPersonal OR i.IdTipoPersonal IS NULL)
+JOIN @PesoPorGrupo pg ON pg.IdFormulario = f.IdFormulario AND pg.ClaveGrupo = N'IndicadoresGestion';
 GO
 
 -- =========================================================
@@ -627,39 +771,113 @@ SELECT @IdRespJefe, fc.IdCompetencia, 3, N'Evaluación del jefe — ejemplo de d
 FROM dbo.FormularioCompetencia fc
 WHERE fc.IdFormulario = @IdFormJefeOperario;
 
+-- Indicadores de gestión (Entregable 11) — Meta y Resultado del mes son datos operativos
+-- objetivos del área, no una apreciación subjetiva del evaluador; por eso se usan los mismos
+-- valores de ejemplo (ficticios) tanto en la autoevaluación como en la evaluación del jefe.
+INSERT INTO dbo.RespuestaIndicadorDetalle (IdRespuesta, IdIndicador, Meta, ResultadoMes)
+SELECT @IdRespAuto, fi.IdIndicador, 90.00,
+       CASE i.Nombre
+           WHEN N'Cultura: 5S+1' THEN 95.00
+           WHEN N'Eficiencia'    THEN 85.00
+           WHEN N'Calidad'       THEN 92.00
+           WHEN N'Ausentismo'    THEN 78.00
+       END
+FROM dbo.FormularioIndicador fi
+JOIN dbo.IndicadorGestion i ON i.IdIndicador = fi.IdIndicador
+WHERE fi.IdFormulario = @IdFormAutoOperario;
+
+INSERT INTO dbo.RespuestaIndicadorDetalle (IdRespuesta, IdIndicador, Meta, ResultadoMes)
+SELECT @IdRespJefe, fi.IdIndicador, 90.00,
+       CASE i.Nombre
+           WHEN N'Cultura: 5S+1' THEN 95.00
+           WHEN N'Eficiencia'    THEN 85.00
+           WHEN N'Calidad'       THEN 92.00
+           WHEN N'Ausentismo'    THEN 78.00
+       END
+FROM dbo.FormularioIndicador fi
+JOIN dbo.IndicadorGestion i ON i.IdIndicador = fi.IdIndicador
+WHERE fi.IdFormulario = @IdFormJefeOperario;
+
 UPDATE dbo.AsignacionEvaluacion SET Estado = 'Completada' WHERE IdAsignacion IN (@IdAsigAuto, @IdAsigJefe);
 
--- Promedio ponderado por la Ponderacion real de cada competencia dentro de su formulario (RF-06/
--- RF-07 — sección 6), no un promedio simple: de lo contrario el peso configurado por macro-grupo
--- no tendría ningún efecto real sobre el resultado consolidado (misma corrección aplicada en
--- ResultadoService.ConsolidarSiCompletoAsync, en la aplicación). Para el formulario de Operario
--- usado en este ejemplo no hay categorías configuradas, así que el peso es parejo (100%/N) y el
--- resultado coincide con un promedio simple — la diferencia se nota en formularios como el de
--- Conductor, que sí usa los macro-grupos al 50%/50%.
+-- Promedio ponderado por la Ponderacion real de cada ítem dentro de su formulario (RF-06/RF-07
+-- ampliado en el Entregable 11 — sección 6), combinando competencias (escala 1-5 directa) e
+-- indicadores de gestión (Meta/Resultado del mes en %, convertidos a escala 1-5 mediante la
+-- misma fórmula que ResultadoService.EquivalenciaUnoACinco de la aplicación:
+-- CLAMP(1 + 4*(ResultadoMes/100), 1, 5) — 0%→1, 100%→5, acotado para no desbordar la escala
+-- combinada). La suma se autonormaliza dividiendo por SUM(Ponderacion) de todos los ítems
+-- presentes (no un denominador fijo de 100), por lo que el resultado queda siempre acotado en
+-- [1,5] aun cuando las ponderaciones de los indicadores dentro de su grupo sumen ~133% (decisión
+-- explícita del usuario, ver sección 5 de este script). Para el formulario de Operario usado en
+-- este ejemplo las competencias no tienen categoría configurada como caso especial, pero sí
+-- están presentes las tres claves de macro-grupo (Organizacional/DeRol/IndicadoresGestion), así
+-- que se aplican los pesos fijos 20%/30%/50% de la sección 6.
 INSERT INTO dbo.ResultadoConsolidado (CodigoEvaluado, IdPeriodo, PromedioAutoevaluacion, PromedioJefe, PromedioAscendente, PromedioGeneral, FechaConsolidacion)
 SELECT
     1013,
     @IdPeriodo2026,
-    (SELECT SUM(rd.Calificacion * fc.Ponderacion) / NULLIF(SUM(fc.Ponderacion), 0)
-     FROM dbo.RespuestaDetalle rd
-     JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormAutoOperario AND fc.IdCompetencia = rd.IdCompetencia
-     WHERE rd.IdRespuesta = @IdRespAuto),
-    (SELECT SUM(rd.Calificacion * fc.Ponderacion) / NULLIF(SUM(fc.Ponderacion), 0)
-     FROM dbo.RespuestaDetalle rd
-     JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormJefeOperario AND fc.IdCompetencia = rd.IdCompetencia
-     WHERE rd.IdRespuesta = @IdRespJefe),
-    NULL,
-    (SELECT SUM(x.Calificacion * x.Ponderacion) / NULLIF(SUM(x.Ponderacion), 0)
+    (SELECT SUM(x.Valor * x.Ponderacion) / NULLIF(SUM(x.Ponderacion), 0)
      FROM (
-        SELECT rd.Calificacion, fc.Ponderacion
+        SELECT CAST(rd.Calificacion AS DECIMAL(9,4)) AS Valor, fc.Ponderacion
         FROM dbo.RespuestaDetalle rd
         JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormAutoOperario AND fc.IdCompetencia = rd.IdCompetencia
         WHERE rd.IdRespuesta = @IdRespAuto
         UNION ALL
-        SELECT rd.Calificacion, fc.Ponderacion
+        SELECT
+            CASE WHEN 1 + 4 * (rid.ResultadoMes / 100.0) < 1 THEN 1
+                 WHEN 1 + 4 * (rid.ResultadoMes / 100.0) > 5 THEN 5
+                 ELSE 1 + 4 * (rid.ResultadoMes / 100.0) END,
+            fi.Ponderacion
+        FROM dbo.RespuestaIndicadorDetalle rid
+        JOIN dbo.FormularioIndicador fi ON fi.IdFormulario = @IdFormAutoOperario AND fi.IdIndicador = rid.IdIndicador
+        WHERE rid.IdRespuesta = @IdRespAuto AND rid.ResultadoMes IS NOT NULL
+     ) AS x),
+    (SELECT SUM(x.Valor * x.Ponderacion) / NULLIF(SUM(x.Ponderacion), 0)
+     FROM (
+        SELECT CAST(rd.Calificacion AS DECIMAL(9,4)) AS Valor, fc.Ponderacion
         FROM dbo.RespuestaDetalle rd
         JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormJefeOperario AND fc.IdCompetencia = rd.IdCompetencia
         WHERE rd.IdRespuesta = @IdRespJefe
+        UNION ALL
+        SELECT
+            CASE WHEN 1 + 4 * (rid.ResultadoMes / 100.0) < 1 THEN 1
+                 WHEN 1 + 4 * (rid.ResultadoMes / 100.0) > 5 THEN 5
+                 ELSE 1 + 4 * (rid.ResultadoMes / 100.0) END,
+            fi.Ponderacion
+        FROM dbo.RespuestaIndicadorDetalle rid
+        JOIN dbo.FormularioIndicador fi ON fi.IdFormulario = @IdFormJefeOperario AND fi.IdIndicador = rid.IdIndicador
+        WHERE rid.IdRespuesta = @IdRespJefe AND rid.ResultadoMes IS NOT NULL
+     ) AS x),
+    NULL,
+    (SELECT SUM(x.Valor * x.Ponderacion) / NULLIF(SUM(x.Ponderacion), 0)
+     FROM (
+        SELECT CAST(rd.Calificacion AS DECIMAL(9,4)) AS Valor, fc.Ponderacion
+        FROM dbo.RespuestaDetalle rd
+        JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormAutoOperario AND fc.IdCompetencia = rd.IdCompetencia
+        WHERE rd.IdRespuesta = @IdRespAuto
+        UNION ALL
+        SELECT CAST(rd.Calificacion AS DECIMAL(9,4)), fc.Ponderacion
+        FROM dbo.RespuestaDetalle rd
+        JOIN dbo.FormularioCompetencia fc ON fc.IdFormulario = @IdFormJefeOperario AND fc.IdCompetencia = rd.IdCompetencia
+        WHERE rd.IdRespuesta = @IdRespJefe
+        UNION ALL
+        SELECT
+            CASE WHEN 1 + 4 * (rid.ResultadoMes / 100.0) < 1 THEN 1
+                 WHEN 1 + 4 * (rid.ResultadoMes / 100.0) > 5 THEN 5
+                 ELSE 1 + 4 * (rid.ResultadoMes / 100.0) END,
+            fi.Ponderacion
+        FROM dbo.RespuestaIndicadorDetalle rid
+        JOIN dbo.FormularioIndicador fi ON fi.IdFormulario = @IdFormAutoOperario AND fi.IdIndicador = rid.IdIndicador
+        WHERE rid.IdRespuesta = @IdRespAuto AND rid.ResultadoMes IS NOT NULL
+        UNION ALL
+        SELECT
+            CASE WHEN 1 + 4 * (rid.ResultadoMes / 100.0) < 1 THEN 1
+                 WHEN 1 + 4 * (rid.ResultadoMes / 100.0) > 5 THEN 5
+                 ELSE 1 + 4 * (rid.ResultadoMes / 100.0) END,
+            fi.Ponderacion
+        FROM dbo.RespuestaIndicadorDetalle rid
+        JOIN dbo.FormularioIndicador fi ON fi.IdFormulario = @IdFormJefeOperario AND fi.IdIndicador = rid.IdIndicador
+        WHERE rid.IdRespuesta = @IdRespJefe AND rid.ResultadoMes IS NOT NULL
      ) AS x),
     SYSDATETIME();
 GO
@@ -675,12 +893,15 @@ UNION ALL SELECT 'Rol', COUNT(*) FROM dbo.Rol
 UNION ALL SELECT 'Usuario', COUNT(*) FROM dbo.Usuario
 UNION ALL SELECT 'UsuarioRol', COUNT(*) FROM dbo.UsuarioRol
 UNION ALL SELECT 'Competencia', COUNT(*) FROM dbo.Competencia
+UNION ALL SELECT 'IndicadorGestion', COUNT(*) FROM dbo.IndicadorGestion
 UNION ALL SELECT 'PeriodoEvaluacion', COUNT(*) FROM dbo.PeriodoEvaluacion
 UNION ALL SELECT 'FormularioEvaluacion', COUNT(*) FROM dbo.FormularioEvaluacion
 UNION ALL SELECT 'FormularioCompetencia', COUNT(*) FROM dbo.FormularioCompetencia
+UNION ALL SELECT 'FormularioIndicador', COUNT(*) FROM dbo.FormularioIndicador
 UNION ALL SELECT 'AsignacionEvaluacion', COUNT(*) FROM dbo.AsignacionEvaluacion
 UNION ALL SELECT 'RespuestaEvaluacion', COUNT(*) FROM dbo.RespuestaEvaluacion
 UNION ALL SELECT 'RespuestaDetalle', COUNT(*) FROM dbo.RespuestaDetalle
+UNION ALL SELECT 'RespuestaIndicadorDetalle', COUNT(*) FROM dbo.RespuestaIndicadorDetalle
 UNION ALL SELECT 'ResultadoConsolidado', COUNT(*) FROM dbo.ResultadoConsolidado
 UNION ALL SELECT 'ContactoNotificacion', COUNT(*) FROM dbo.ContactoNotificacion
 UNION ALL SELECT 'EnvioResultadoToken', COUNT(*) FROM dbo.EnvioResultadoToken;

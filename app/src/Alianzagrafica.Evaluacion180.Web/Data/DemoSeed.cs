@@ -259,6 +259,54 @@ public static class DemoSeed
             });
         await db.SaveChangesAsync();
 
+        // ---- Indicadores de gestión (Entregable 11) ----
+        // Tomados, con su nombre, fórmula y ponderación, del formato real de Alianzagrafica
+        // "EVALUACION DESEMPEÑO Indicadores" (macro-grupo "INDICADORES DE GESTIÓN", 50% de la
+        // nota final). Son genéricos (IdTipoPersonal = null): aplican a los seis tipos de
+        // personal, igual que las 4 competencias organizacionales. No se copió ningún dato de
+        // persona real de ese archivo — la Meta/Resultado del mes de cada indicador la
+        // diligencia cada evaluador, no viene precargada en la siembra.
+        //
+        // Advertencia de ponderación (confirmada con el usuario, Entregable 11): en el Excel
+        // origen, los 4 indicadores quedaron cada uno al 33.33% dentro del grupo, sumando ~133%
+        // en vez de 100% — se dejó exactamente así a propósito ("tal y como está en el Excel"),
+        // en vez de normalizarlo a que sume 100%. Ver Constantes.PesoIndicadoresGestion y
+        // AsignacionService.GenerarFormulariosAsync para cómo se usa este peso.
+        db.IndicadoresGestion.AddRange(
+            new IndicadorGestion
+            {
+                Nombre = "Cultura: 5S+1",
+                Formula = "Costo de reclamos del cliente ($) facturación.",
+                Ponderacion = 33.33m,
+                IdTipoPersonal = null,
+                Activa = true,
+            },
+            new IndicadorGestion
+            {
+                Nombre = "Eficiencia",
+                Formula = "Cantidad unidades defectuosas / Cantidad unidades producidas",
+                Ponderacion = 33.33m,
+                IdTipoPersonal = null,
+                Activa = true,
+            },
+            new IndicadorGestion
+            {
+                Nombre = "Calidad",
+                Formula = "(Horas laboradas - Horas de ausentismo) / Horas totales laboradas",
+                Ponderacion = 33.33m,
+                IdTipoPersonal = null,
+                Activa = true,
+            },
+            new IndicadorGestion
+            {
+                Nombre = "Ausentismo",
+                Formula = "Rendimiento real / Rendimiento esperado",
+                Ponderacion = 33.33m,
+                IdTipoPersonal = null,
+                Activa = true,
+            });
+        await db.SaveChangesAsync();
+
         // ---- Periodo de evaluación abierto ----
         var periodo = new PeriodoEvaluacion
         {

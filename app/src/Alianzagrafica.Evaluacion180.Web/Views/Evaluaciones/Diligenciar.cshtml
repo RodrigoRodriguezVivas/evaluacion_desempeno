@@ -12,13 +12,16 @@
         .GroupBy(x => x.item.Categoria)
         .ToList();
 
-    // Solo se considera que el formulario usa macro-grupos si hay al menos 2 categorías reales
-    // (Organizacional / DeRol) presentes — si ninguna competencia tiene categoría asignada, el
-    // formulario se muestra igual que siempre (sin encabezados de grupo ni subtotales).
+    // Solo se considera que el formulario usa macro-grupos de competencias si hay al menos 2
+    // categorías reales (Organizacional / DeRol) presentes.
     var categoriasConEtiqueta = new HashSet<string>(gruposCompetencias
         .Where(g => g.Key == "Organizacional" || g.Key == "DeRol")
         .Select(g => g.Key!));
     var usaMacroGrupos = categoriasConEtiqueta.Count >= 2;
+    var hayIndicadores = Model.Indicadores.Count > 0;
+    // Se muestra la fila/sección "NOTA FINAL" combinada en cuanto hay más de un macro-grupo
+    // evaluable en el formulario (2 de competencias, o competencias + indicadores).
+    var mostrarNotaFinal = usaMacroGrupos || hayIndicadores;
 
     string? EtiquetaGrupo(string? categoria) => categoria switch
     {
@@ -39,8 +42,41 @@
         return (subtotal, pesoGrupo);
     }
 
-    var itemsConMacroGrupo = Model.Items.Where(i => i.Categoria == "Organizacional" || i.Categoria == "DeRol").ToList();
-    var (notaFinal, _) = CalcularSubtotal(itemsConMacroGrupo);
+    // Convierte el % de cumplimiento de un indicador de gestión a un equivalente en la escala
+    // 1-5 que usan las competencias (Entregable 11): 0% -> 1, 100% -> 5, lineal, limitado a
+    // [1,5]. Debe ser EXACTAMENTE la misma fórmula que usa ResultadoService.cs en el servidor —
+    // aquí solo se usa para la vista previa en vivo mientras se diligencia.
+    decimal EquivalenciaUnoACinco(decimal resultadoMesPuntos) =>
+        Math.Clamp(1m + 4m * (resultadoMesPuntos / 100m), 1m, 5m);
+
+    (decimal? SubtotalPorcentaje, decimal? SubtotalEquivalente, decimal PesoGrupo) CalcularSubtotalIndicadores(IEnumerable<ItemIndicadorViewModel> items)
+    {
+        var lista = items.ToList();
+        var pesoGrupo = lista.Sum(i => i.Ponderacion);
+        var respondidos = lista.Where(i => i.ResultadoMes.HasValue).ToList();
+        var sumaPesoRespondidos = respondidos.Sum(i => i.Ponderacion);
+        if (respondidos.Count == 0 || sumaPesoRespondidos <= 0) return (null, null, pesoGrupo);
+        var subtotalPct = Math.Round(respondidos.Sum(i => i.ResultadoMes!.Value * i.Ponderacion) / sumaPesoRespondidos, 2);
+        var subtotalEq = Math.Round(EquivalenciaUnoACinco(subtotalPct), 2);
+        return (subtotalPct, subtotalEq, pesoGrupo);
+    }
+
+    var (_, subtotalIndicadoresEq, pesoGrupoIndicadores) = CalcularSubtotalIndicadores(Model.Indicadores);
+
+    // NOTA FINAL combinada: un único promedio ponderado sobre TODOS los ítems evaluables
+    // (competencias en escala 1-5 + indicadores convertidos a su equivalente 1-5), usando el
+    // peso absoluto ya calculado de cada uno (Ítem.Ponderacion) — misma fórmula que
+    // ResultadoService.PromedioPonderado en el servidor.
+    decimal? notaFinal;
+    {
+        var valoresCompetencias = Model.Items.Where(i => i.Calificacion.HasValue)
+            .Select(i => (Valor: (decimal)i.Calificacion!.Value, Peso: i.Ponderacion));
+        var valoresIndicadores = Model.Indicadores.Where(i => i.ResultadoMes.HasValue)
+            .Select(i => (Valor: EquivalenciaUnoACinco(i.ResultadoMes!.Value), Peso: i.Ponderacion));
+        var todos = valoresCompetencias.Concat(valoresIndicadores).ToList();
+        var sumaPeso = todos.Sum(x => x.Peso);
+        notaFinal = todos.Count > 0 && sumaPeso > 0 ? Math.Round(todos.Sum(x => x.Valor * x.Peso) / sumaPeso, 2) : (decimal?)null;
+    }
 }
 
 <h1 class="h3 mt-4">Evaluación — @Model.TipoRelacionTexto</h1>
@@ -51,24 +87,24 @@
 
 <div asp-validation-summary="ModelOnly" class="text-danger"></div>
 
-@if (Model.Items.Count == 0)
+@if (Model.Items.Count == 0 && Model.Indicadores.Count == 0)
 {
-    <div class="alert alert-warning">Este formulario no tiene competencias configuradas todavía. Contacta al administrador de Gestión Humana.</div>
+    <div class="alert alert-warning">Este formulario no tiene competencias ni indicadores configurados todavía. Contacta al administrador de Gestión Humana.</div>
 }
 else
 {
-    <p class="escala-ayuda">Escala: 1 = Insatisfactorio · 2 = En desarrollo · 3 = Cumple lo esperado · 4 = Sobresaliente · 5 = Excepcional</p>
+    <p class="escala-ayuda">Escala de competencias: 1 = Insatisfactorio · 2 = En desarrollo · 3 = Cumple lo esperado · 4 = Sobresaliente · 5 = Excepcional</p>
     <p class="escala-ayuda small text-muted">
         Equivalencia con la escala de calificación del formato interno anterior (GHU-FOR-007):
         1-2 ≈ Deficiente (0%-59%) · 3 ≈ Aceptable (60%-79%) · 4 ≈ Bueno (80%-90%) · 5 ≈ Sobresaliente (91%-100%).
     </p>
-    @if (usaMacroGrupos)
+    @if (mostrarNotaFinal)
     {
         <p class="escala-ayuda small text-muted">
-            Las competencias de este formulario están agrupadas en dos macro-grupos (RF-07), cada uno con el
-            50% de la nota final: <strong>Evaluación de competencias organizacionales</strong> y
-            <strong>Evaluación de competencias de rol</strong>. Cada grupo se califica y se suma por separado
-            (subtotal del grupo); la nota final es la suma de ambos subtotales, cada uno ya ponderado a su 50%.
+            Este formulario combina macro-grupos de evaluación, cada uno con su propio peso sobre la nota
+            final@(hayIndicadores ? ": Indicadores de Gestión, Evaluación de competencias organizacionales y Evaluación de competencias de rol." : " (Evaluación de competencias organizacionales y de rol)."))
+            Cada grupo se califica y se suma por separado (subtotal del grupo); la NOTA FINAL es la combinación de
+            todos los subtotales, cada uno ya ponderado según su peso.
         </p>
     }
 
@@ -81,93 +117,220 @@ else
         <input type="hidden" asp-for="PeriodoNombre" />
         <input type="hidden" asp-for="SoloLectura" />
 
-        <div class="table-responsive">
-            <table class="table tabla-competencias bg-white align-middle">
-                <thead>
-                    <tr>
-                        <th style="width: 22%">Competencia</th>
-                        <th>Descripción</th>
-                        <th style="width: 10%">Ponderación</th>
-                        <th style="width: 12%">Calificación</th>
-                        <th style="width: 24%">Comentario</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var grupo in gruposCompetencias)
-                    {
-                        var etiquetaGrupo = EtiquetaGrupo(grupo.Key);
-                        var (subtotalGrupo, pesoGrupo) = CalcularSubtotal(grupo.Select(x => x.item));
-
-                        if (etiquetaGrupo is not null)
+        @if (hayIndicadores)
+        {
+            <h2 class="h5 mt-4">
+                INDICADORES DE GESTIÓN (@pesoGrupoIndicadores.ToString("0.##")% del total)
+            </h2>
+            <p class="escala-ayuda small text-muted">
+                Para cada indicador, registra la Meta y el Resultado del mes/periodo en porcentaje (ej. escribe
+                <strong>90</strong> para 90%). El sistema calcula el % de cumplimiento del grupo y lo convierte a
+                la escala 1-5 para combinarlo con las competencias en la NOTA FINAL.
+            </p>
+            <div class="table-responsive">
+                <table class="table tabla-competencias bg-white align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 18%">Nombre indicador</th>
+                            <th>Fórmula</th>
+                            <th style="width: 12%">Meta (%)</th>
+                            <th style="width: 14%">Resultado del mes (%)</th>
+                            <th style="width: 12%">Ponderación</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @for (var idx = 0; idx < Model.Indicadores.Count; idx++)
                         {
-                            <tr class="table-secondary">
-                                <th colspan="5" class="small text-uppercase">
-                                    @etiquetaGrupo.ToUpperInvariant() (@pesoGrupo.ToString("0.##")% del total)
-                                </th>
-                            </tr>
-                        }
-                        @foreach (var (item, idx) in grupo)
-                        {
-                            <tr data-categoria="@(item.Categoria ?? "")" data-ponderacion="@item.Ponderacion.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                            var indicador = Model.Indicadores[idx];
+                            <tr data-indicador="1" data-ponderacion="@indicador.Ponderacion.ToString(System.Globalization.CultureInfo.InvariantCulture)">
                                 <td>
-                                    <strong>@Model.Items[idx].Nombre</strong>
-                                    <input type="hidden" asp-for="Items[idx].IdCompetencia" />
-                                    <input type="hidden" asp-for="Items[idx].Nombre" />
-                                    <input type="hidden" asp-for="Items[idx].Categoria" />
-                                    <input type="hidden" asp-for="Items[idx].Ponderacion" />
+                                    <strong>@indicador.Nombre</strong>
+                                    <input type="hidden" asp-for="Indicadores[idx].IdIndicador" />
+                                    <input type="hidden" asp-for="Indicadores[idx].Nombre" />
+                                    <input type="hidden" asp-for="Indicadores[idx].Formula" />
+                                    <input type="hidden" asp-for="Indicadores[idx].Ponderacion" />
                                 </td>
-                                <td class="small text-muted">@Model.Items[idx].Descripcion</td>
-                                <td>@Model.Items[idx].Ponderacion%</td>
+                                <td class="small text-muted">@indicador.Formula</td>
                                 <td>
                                     @if (Model.SoloLectura)
                                     {
-                                        <span class="fw-bold">@(Model.Items[idx].Calificacion?.ToString() ?? "—")</span>
+                                        <span class="fw-bold">@(indicador.Meta?.ToString("0.##") ?? "—")@(indicador.Meta.HasValue ? "%" : "")</span>
                                     }
                                     else
                                     {
-                                        <select asp-for="Items[idx].Calificacion" class="form-select form-select-sm" data-calificacion="1">
-                                            <option value="">—</option>
-                                            <option value="1">1</option>
-                                            <option value="2">2</option>
-                                            <option value="3">3</option>
-                                            <option value="4">4</option>
-                                            <option value="5">5</option>
-                                        </select>
+                                        <input type="number" step="0.01" min="0" max="500" asp-for="Indicadores[idx].Meta" class="form-control form-control-sm" data-meta="1" />
                                     }
                                 </td>
                                 <td>
                                     @if (Model.SoloLectura)
                                     {
-                                        <span class="small">@Model.Items[idx].Comentario</span>
+                                        <span class="fw-bold">@(indicador.ResultadoMes?.ToString("0.##") ?? "—")@(indicador.ResultadoMes.HasValue ? "%" : "")</span>
                                     }
                                     else
                                     {
-                                        <textarea asp-for="Items[idx].Comentario" class="form-control form-control-sm" rows="2"></textarea>
+                                        <input type="number" step="0.01" min="0" max="500" asp-for="Indicadores[idx].ResultadoMes" class="form-control form-control-sm" data-resultado-mes="1" />
                                     }
                                 </td>
+                                <td>@indicador.Ponderacion.ToString("0.##")</td>
                             </tr>
                         }
-                        @if (etiquetaGrupo is not null)
-                        {
-                            <tr class="table-light fw-semibold" data-subtotal-grupo="@grupo.Key">
-                                <td colspan="3" class="text-end">Subtotal — @etiquetaGrupo</td>
-                                <td colspan="2" class="subtotal-valor">
-                                    @(subtotalGrupo is not null ? $"{subtotalGrupo.Value.ToString("0.00")} / 5" : "— (faltan calificaciones)")
-                                </td>
-                            </tr>
-                        }
-                    }
-                    @if (usaMacroGrupos)
-                    {
-                        <tr class="table-dark text-white">
-                            <td colspan="3" class="text-end fw-bold">NOTA FINAL (Organizacional 50% + De Rol 50%)</td>
-                            <td colspan="2" class="fw-bold" id="nota-final-valor">
-                                @(notaFinal is not null ? $"{notaFinal.Value.ToString("0.00")} / 5" : "— (faltan calificaciones)")
+                    </tbody>
+                    <tfoot>
+                        <tr class="table-light fw-semibold" data-subtotal-indicadores="1">
+                            <td colspan="4" class="text-end">Subtotal — Indicadores de Gestión</td>
+                            <td class="subtotal-valor-indicadores">
+                                @(subtotalIndicadoresEq is not null ? $"{subtotalIndicadoresEq.Value.ToString("0.00")} / 5" : "— (faltan resultados)")
                             </td>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </tfoot>
+                </table>
+            </div>
+            <p class="escala-ayuda small text-muted">
+                La suma de las ponderaciones individuales de los indicadores puede no dar exactamente 100% dentro
+                del grupo (en este formato, 33.33% × 4 = 133.32%) — se dejó tal como está en el formato de origen;
+                por eso el peso efectivo de este grupo en la NOTA FINAL puede ser algo mayor a su peso nominal.
+            </p>
+        }
+
+        @if (Model.Items.Count > 0)
+        {
+            <h2 class="h5 mt-4">Competencias</h2>
+            <div class="table-responsive">
+                <table class="table tabla-competencias bg-white align-middle">
+                    <thead>
+                        <tr>
+                            <th style="width: 22%">Competencia</th>
+                            <th>Descripción</th>
+                            <th style="width: 10%">Ponderación</th>
+                            <th style="width: 12%">Calificación</th>
+                            <th style="width: 24%">Comentario</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach (var grupo in gruposCompetencias)
+                        {
+                            var etiquetaGrupo = EtiquetaGrupo(grupo.Key);
+                            var (subtotalGrupo, pesoGrupo) = CalcularSubtotal(grupo.Select(x => x.item));
+
+                            if (etiquetaGrupo is not null)
+                            {
+                                <tr class="table-secondary">
+                                    <th colspan="5" class="small text-uppercase">
+                                        @etiquetaGrupo.ToUpperInvariant() (@pesoGrupo.ToString("0.##")% del total)
+                                    </th>
+                                </tr>
+                            }
+                            @foreach (var (item, idx) in grupo)
+                            {
+                                <tr data-categoria="@(item.Categoria ?? "")" data-ponderacion="@item.Ponderacion.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                                    <td>
+                                        <strong>@Model.Items[idx].Nombre</strong>
+                                        <input type="hidden" asp-for="Items[idx].IdCompetencia" />
+                                        <input type="hidden" asp-for="Items[idx].Nombre" />
+                                        <input type="hidden" asp-for="Items[idx].Categoria" />
+                                        <input type="hidden" asp-for="Items[idx].Ponderacion" />
+                                    </td>
+                                    <td class="small text-muted">@Model.Items[idx].Descripcion</td>
+                                    <td>@Model.Items[idx].Ponderacion%</td>
+                                    <td>
+                                        @if (Model.SoloLectura)
+                                        {
+                                            <span class="fw-bold">@(Model.Items[idx].Calificacion?.ToString() ?? "—")</span>
+                                        }
+                                        else
+                                        {
+                                            <select asp-for="Items[idx].Calificacion" class="form-select form-select-sm" data-calificacion="1">
+                                                <option value="">—</option>
+                                                <option value="1">1</option>
+                                                <option value="2">2</option>
+                                                <option value="3">3</option>
+                                                <option value="4">4</option>
+                                                <option value="5">5</option>
+                                            </select>
+                                        }
+                                    </td>
+                                    <td>
+                                        @if (Model.SoloLectura)
+                                        {
+                                            <span class="small">@Model.Items[idx].Comentario</span>
+                                        }
+                                        else
+                                        {
+                                            <textarea asp-for="Items[idx].Comentario" class="form-control form-control-sm" rows="2"></textarea>
+                                        }
+                                    </td>
+                                </tr>
+                            }
+                            @if (etiquetaGrupo is not null)
+                            {
+                                <tr class="table-light fw-semibold" data-subtotal-grupo="@grupo.Key">
+                                    <td colspan="3" class="text-end">Subtotal — @etiquetaGrupo</td>
+                                    <td colspan="2" class="subtotal-valor">
+                                        @(subtotalGrupo is not null ? $"{subtotalGrupo.Value.ToString("0.00")} / 5" : "— (faltan calificaciones)")
+                                    </td>
+                                </tr>
+                            }
+                        }
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        @if (mostrarNotaFinal)
+        {
+            <div class="table-responsive">
+                <table class="table bg-white align-middle mb-0">
+                    <tbody>
+                        <tr class="table-dark text-white">
+                            <td class="fw-bold">NOTA FINAL (combina todos los macro-grupos según su peso)</td>
+                            <td class="fw-bold text-end" id="nota-final-valor" style="width: 160px;">
+                                @(notaFinal is not null ? $"{notaFinal.Value.ToString("0.00")} / 5" : "— (faltan calificaciones/resultados)")
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        }
+
+        <h2 class="h5 mt-4">Compromisos</h2>
+        <div class="mb-3">
+            <label asp-for="OportunidadesMejora" class="form-label fw-semibold">Oportunidades de mejora</label>
+            <p class="escala-ayuda small text-muted mb-1">
+                Describan los comentarios adicionales que considere pertinentes registrar (Trabajador y Jefe Inmediato).
+            </p>
+            @if (Model.SoloLectura)
+            {
+                <p class="small">@(string.IsNullOrWhiteSpace(Model.OportunidadesMejora) ? "—" : Model.OportunidadesMejora)</p>
+            }
+            else
+            {
+                <textarea asp-for="OportunidadesMejora" class="form-control" rows="3" maxlength="2000"></textarea>
+            }
+        </div>
+        <div class="mb-3">
+            <label asp-for="Compromisos" class="form-label fw-semibold">Compromisos</label>
+            @if (Model.SoloLectura)
+            {
+                <p class="small">@(string.IsNullOrWhiteSpace(Model.Compromisos) ? "—" : Model.Compromisos)</p>
+            }
+            else
+            {
+                <textarea asp-for="Compromisos" class="form-control" rows="3" maxlength="2000"></textarea>
+            }
+        </div>
+        <div class="mb-3">
+            <label asp-for="RevisionCompromisos" class="form-label fw-semibold">Revisión de compromisos</label>
+            <p class="escala-ayuda small text-muted mb-1">
+                Este ítem lo revisan entre las dos partes, describiendo los compromisos realizados en las evaluaciones anteriores.
+            </p>
+            @if (Model.SoloLectura)
+            {
+                <p class="small">@(string.IsNullOrWhiteSpace(Model.RevisionCompromisos) ? "—" : Model.RevisionCompromisos)</p>
+            }
+            else
+            {
+                <textarea asp-for="RevisionCompromisos" class="form-control" rows="3" maxlength="2000"></textarea>
+            }
         </div>
 
         @if (!Model.SoloLectura)
@@ -178,16 +341,27 @@ else
                 <a class="btn btn-link" asp-action="Mis">Cancelar</a>
             </div>
 
-            @if (usaMacroGrupos)
+            @if (mostrarNotaFinal)
             {
                 <script>
-                    // Recalcula en vivo, en el navegador, los subtotales por macro-grupo y la nota
-                    // final a medida que el evaluador califica — puramente visual/informativo
-                    // (una guía mientras se diligencia); el cálculo que realmente cuenta es el que
-                    // hace el servidor con los mismos datos al consolidar (ResultadoService).
+                    // Recalcula en vivo, en el navegador, los subtotales por macro-grupo (competencias e
+                    // indicadores de gestión) y la nota final a medida que el evaluador va diligenciando —
+                    // puramente visual/informativo; el cálculo que realmente cuenta es el que hace el
+                    // servidor con los mismos datos al consolidar (ResultadoService), usando exactamente
+                    // la misma fórmula (incluida la equivalencia 1-5 de los indicadores).
                     (function () {
+                        function equivalenciaUnoACinco(resultadoMesPuntos) {
+                            var valor = 1 + 4 * (resultadoMesPuntos / 100);
+                            if (valor < 1) valor = 1;
+                            if (valor > 5) valor = 5;
+                            return valor;
+                        }
+
                         function recalcular() {
-                            var grupos = {};
+                            var sumaPesoTotal = 0, sumaPonderadaTotal = 0;
+
+                            // Competencias, por macro-grupo (Organizacional / DeRol)
+                            var gruposCompetencias = {};
                             document.querySelectorAll('#formEvaluacion tr[data-categoria]').forEach(function (fila) {
                                 var categoria = fila.getAttribute('data-categoria');
                                 if (categoria !== 'Organizacional' && categoria !== 'DeRol') return;
@@ -195,36 +369,59 @@ else
                                 var select = fila.querySelector('select[data-calificacion]');
                                 var valor = select ? select.value : '';
 
-                                if (!grupos[categoria]) grupos[categoria] = { sumaPeso: 0, sumaPonderada: 0 };
+                                if (!gruposCompetencias[categoria]) gruposCompetencias[categoria] = { sumaPeso: 0, sumaPonderada: 0 };
                                 if (valor) {
-                                    grupos[categoria].sumaPeso += ponderacion;
-                                    grupos[categoria].sumaPonderada += ponderacion * parseFloat(valor);
+                                    gruposCompetencias[categoria].sumaPeso += ponderacion;
+                                    gruposCompetencias[categoria].sumaPonderada += ponderacion * parseFloat(valor);
+                                    sumaPesoTotal += ponderacion;
+                                    sumaPonderadaTotal += ponderacion * parseFloat(valor);
                                 }
                             });
-
-                            var sumaPesoTotal = 0, sumaPonderadaTotal = 0;
-                            Object.keys(grupos).forEach(function (categoria) {
-                                var g = grupos[categoria];
+                            Object.keys(gruposCompetencias).forEach(function (categoria) {
+                                var g = gruposCompetencias[categoria];
                                 var celda = document.querySelector('tr[data-subtotal-grupo="' + categoria + '"] .subtotal-valor');
                                 if (celda) {
                                     celda.textContent = g.sumaPeso > 0
                                         ? (g.sumaPonderada / g.sumaPeso).toFixed(2) + ' / 5'
                                         : '— (faltan calificaciones)';
                                 }
-                                sumaPesoTotal += g.sumaPeso;
-                                sumaPonderadaTotal += g.sumaPonderada;
                             });
+
+                            // Indicadores de gestión
+                            var indSumaPeso = 0, indSumaPonderada = 0;
+                            document.querySelectorAll('#formEvaluacion tr[data-indicador]').forEach(function (fila) {
+                                var ponderacion = parseFloat(fila.getAttribute('data-ponderacion')) || 0;
+                                var inputResultado = fila.querySelector('input[data-resultado-mes]');
+                                var valor = inputResultado ? inputResultado.value : '';
+                                if (valor !== '') {
+                                    var equivalente = equivalenciaUnoACinco(parseFloat(valor));
+                                    indSumaPeso += ponderacion;
+                                    indSumaPonderada += ponderacion * equivalente;
+                                    sumaPesoTotal += ponderacion;
+                                    sumaPonderadaTotal += ponderacion * equivalente;
+                                }
+                            });
+                            var celdaIndicadores = document.querySelector('[data-subtotal-indicadores] .subtotal-valor-indicadores');
+                            if (celdaIndicadores) {
+                                celdaIndicadores.textContent = indSumaPeso > 0
+                                    ? (indSumaPonderada / indSumaPeso).toFixed(2) + ' / 5'
+                                    : '— (faltan resultados)';
+                            }
 
                             var notaFinalEl = document.getElementById('nota-final-valor');
                             if (notaFinalEl) {
                                 notaFinalEl.textContent = sumaPesoTotal > 0
                                     ? (sumaPonderadaTotal / sumaPesoTotal).toFixed(2) + ' / 5'
-                                    : '— (faltan calificaciones)';
+                                    : '— (faltan calificaciones/resultados)';
                             }
                         }
 
                         document.querySelectorAll('#formEvaluacion select[data-calificacion]').forEach(function (select) {
                             select.addEventListener('change', recalcular);
+                        });
+                        document.querySelectorAll('#formEvaluacion input[data-resultado-mes]').forEach(function (input) {
+                            input.addEventListener('input', recalcular);
+                            input.addEventListener('change', recalcular);
                         });
                         recalcular();
                     })();

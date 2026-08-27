@@ -83,11 +83,23 @@ public class EvaluacionesController : Controller
                 .ToListAsync()
             : new List<FormularioCompetencia>();
 
+        // Indicadores de gestión del formulario (Entregable 11 — macro-grupo "Indicadores de
+        // Gestión", se muestra siempre antes que las competencias, igual que en el Excel origen).
+        var indicadoresFormulario = asignacion.IdFormulario is int idFormularioInd
+            ? await _db.FormularioIndicadores
+                .Include(fi => fi.Indicador)
+                .Where(fi => fi.IdFormulario == idFormularioInd)
+                .OrderBy(fi => fi.Indicador.Nombre)
+                .ToListAsync()
+            : new List<FormularioIndicador>();
+
         var respuesta = await _db.RespuestasEvaluacion
             .Include(r => r.Detalles)
+            .Include(r => r.DetallesIndicadores)
             .FirstOrDefaultAsync(r => r.IdAsignacion == id);
 
         var detallesPorCompetencia = respuesta?.Detalles.ToDictionary(d => d.IdCompetencia) ?? new Dictionary<int, RespuestaDetalle>();
+        var detallesPorIndicador = respuesta?.DetallesIndicadores.ToDictionary(d => d.IdIndicador) ?? new Dictionary<int, RespuestaIndicadorDetalle>();
 
         var modelo = new DiligenciarEvaluacionViewModel
         {
@@ -108,6 +120,18 @@ public class EvaluacionesController : Controller
                 Calificacion = detallesPorCompetencia.TryGetValue(fc.IdCompetencia, out var d) ? d.Calificacion : null,
                 Comentario = detallesPorCompetencia.TryGetValue(fc.IdCompetencia, out var d2) ? d2.Comentario : null,
             }).ToList(),
+            Indicadores = indicadoresFormulario.Select(fi => new ItemIndicadorViewModel
+            {
+                IdIndicador = fi.IdIndicador,
+                Nombre = fi.Indicador.Nombre,
+                Formula = fi.Indicador.Formula,
+                Ponderacion = fi.Ponderacion,
+                Meta = detallesPorIndicador.TryGetValue(fi.IdIndicador, out var di) ? di.Meta : null,
+                ResultadoMes = detallesPorIndicador.TryGetValue(fi.IdIndicador, out var di2) ? di2.ResultadoMes : null,
+            }).ToList(),
+            OportunidadesMejora = respuesta?.OportunidadesMejora,
+            Compromisos = respuesta?.Compromisos,
+            RevisionCompromisos = respuesta?.RevisionCompromisos,
         };
 
         return View(modelo);
@@ -128,6 +152,12 @@ public class EvaluacionesController : Controller
             modelo.SoloLectura = false;
             return View("Diligenciar", modelo);
         }
+        if (modelo.Indicadores.Any(i => i.ResultadoMes is null))
+        {
+            ModelState.AddModelError(string.Empty, "Debes registrar el resultado del mes de todos los indicadores de gestión antes de enviar la evaluación de forma definitiva.");
+            modelo.SoloLectura = false;
+            return View("Diligenciar", modelo);
+        }
         return await Guardar(modelo, enviarDefinitivamente: true);
     }
 
@@ -144,6 +174,7 @@ public class EvaluacionesController : Controller
 
         var respuesta = await _db.RespuestasEvaluacion
             .Include(r => r.Detalles)
+            .Include(r => r.DetallesIndicadores)
             .FirstOrDefaultAsync(r => r.IdAsignacion == asignacion.IdAsignacion);
 
         if (respuesta is null)
@@ -175,6 +206,37 @@ public class EvaluacionesController : Controller
                 });
             }
         }
+
+        // Indicadores de gestión (Entregable 11) — se guarda Meta/Resultado del mes igual que se
+        // guarda Calificacion/Comentario para las competencias, solo cuando el evaluador ya
+        // registró un Resultado del mes (Meta puede quedar sin diligenciar en un borrador).
+        var detallesIndicadoresExistentes = respuesta.DetallesIndicadores.ToDictionary(d => d.IdIndicador);
+
+        foreach (var item in modelo.Indicadores)
+        {
+            if (item.ResultadoMes is null && item.Meta is null) continue;
+
+            if (detallesIndicadoresExistentes.TryGetValue(item.IdIndicador, out var detalleInd))
+            {
+                detalleInd.Meta = item.Meta;
+                detalleInd.ResultadoMes = item.ResultadoMes;
+            }
+            else
+            {
+                _db.RespuestaIndicadorDetalles.Add(new RespuestaIndicadorDetalle
+                {
+                    IdRespuesta = respuesta.IdRespuesta,
+                    IdIndicador = item.IdIndicador,
+                    Meta = item.Meta,
+                    ResultadoMes = item.ResultadoMes,
+                });
+            }
+        }
+
+        // Sección "COMPROMISOS" (Entregable 11) — texto libre, se guarda tal como se diligencia.
+        respuesta.OportunidadesMejora = modelo.OportunidadesMejora;
+        respuesta.Compromisos = modelo.Compromisos;
+        respuesta.RevisionCompromisos = modelo.RevisionCompromisos;
 
         if (enviarDefinitivamente)
         {

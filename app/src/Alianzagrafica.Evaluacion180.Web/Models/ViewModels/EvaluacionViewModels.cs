@@ -42,6 +42,24 @@ public class ItemCompetenciaViewModel
     public string? Comentario { get; set; }
 }
 
+/// <summary>Ítem del macro-grupo "Indicadores de Gestión" (Entregable 11 — formato real
+/// "EVALUACION DESEMPEÑO Indicadores"). A diferencia de <see cref="ItemCompetenciaViewModel"/>,
+/// no se califica de 1 a 5: se captura una Meta y un Resultado del mes, ambos en puntos
+/// porcentuales (ej. 90 = 90%).</summary>
+public class ItemIndicadorViewModel
+{
+    public int IdIndicador { get; set; }
+    public string Nombre { get; set; } = string.Empty;
+    public string? Formula { get; set; }
+    public decimal Ponderacion { get; set; }
+
+    [Range(0, 500, ErrorMessage = "La meta debe ser un valor en % (ej. 90 para 90%).")]
+    public decimal? Meta { get; set; }
+
+    [Range(0, 500, ErrorMessage = "El resultado del mes debe ser un valor en % (ej. 75 para 75%).")]
+    public decimal? ResultadoMes { get; set; }
+}
+
 public class DiligenciarEvaluacionViewModel
 {
     public int IdAsignacion { get; set; }
@@ -52,4 +70,14 @@ public class DiligenciarEvaluacionViewModel
     public string PeriodoNombre { get; set; } = string.Empty;
     public bool SoloLectura { get; set; }
     public List<ItemCompetenciaViewModel> Items { get; set; } = new();
+    public List<ItemIndicadorViewModel> Indicadores { get; set; } = new();
+
+    // Sección "COMPROMISOS" (Entregable 11) — tres campos de texto libre, tal como están en el
+    // Excel origen "EVALUACION DESEMPEÑO Indicadores".
+    [StringLength(2000)]
+    public string? OportunidadesMejora { get; set; }
+    [StringLength(2000)]
+    public string? Compromisos { get; set; }
+    [StringLength(2000)]
+    public string? RevisionCompromisos { get; set; }
 }

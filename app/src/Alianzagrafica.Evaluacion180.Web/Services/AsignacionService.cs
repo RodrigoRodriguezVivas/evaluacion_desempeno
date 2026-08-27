@@ -23,6 +23,7 @@ public class AsignacionService : IAsignacionService
 
         var tipos = await _db.TiposPersonal.ToListAsync();
         var competencias = await _db.Competencias.Where(c => c.Activa).ToListAsync();
+        var indicadores = await _db.IndicadoresGestion.Where(i => i.Activa).ToListAsync();
         var existentes = await _db.FormulariosEvaluacion
             .Where(f => f.IdPeriodo == idPeriodo)
             .Select(f => new { f.TipoRelacion, f.IdTipoPersonal })
@@ -60,23 +61,51 @@ public class AsignacionService : IAsignacionService
                     .Select(g => g.OrderByDescending(c => c.IdTipoPersonal.HasValue).First())
                     .ToList();
 
-                if (competenciasFormulario.Count > 0)
+                // Mismo criterio de deduplicación que las competencias (Entregable 11): un
+                // indicador propio del tipo de personal reemplazaría a uno genérico del mismo
+                // nombre. Hoy los 4 indicadores del formato "EVALUACION DESEMPEÑO Indicadores"
+                // son genéricos (aplican a los seis tipos de personal), pero el mecanismo queda
+                // listo para indicadores específicos por tipo de personal si se agregan después.
+                var indicadoresFormulario = indicadores
+                    .Where(i => i.IdTipoPersonal == tipo.IdTipoPersonal || i.IdTipoPersonal == null)
+                    .GroupBy(i => i.Nombre, StringComparer.OrdinalIgnoreCase)
+                    .Select(g => g.OrderByDescending(i => i.IdTipoPersonal.HasValue).First())
+                    .ToList();
+
+                if (competenciasFormulario.Count > 0 || indicadoresFormulario.Count > 0)
                 {
-                    // Ponderación por macro-grupo (RF-07, formato real GHU-FOR-007): el 100% se
-                    // reparte en partes iguales entre las categorías presentes en el formulario
-                    // (ej. "Organizacional" y "DeRol" → 50%/50%), y dentro de cada categoría el
-                    // peso se reparte en partes iguales entre sus competencias. Una competencia
-                    // sin categoría forma su propio grupo de 1 (comportamiento histórico: si
-                    // ninguna competencia tiene categoría, el resultado es el reparto parejo
-                    // 100%/N de siempre).
-                    var grupos = competenciasFormulario
+                    // Ponderación por macro-grupo (RF-07). Hasta el Entregable 10, el 100% se
+                    // repartía en partes iguales entre las categorías de competencias presentes
+                    // (ej. "Organizacional" y "DeRol" → 50%/50%). Desde el Entregable 11, con el
+                    // grupo "Indicadores de Gestión" incorporado (formato real "EVALUACION
+                    // DESEMPEÑO Indicadores"), se usan pesos FIJOS — Indicadores de Gestión 50%,
+                    // Organizacional 20%, De Rol 30% — cuando los tres grupos están presentes en
+                    // el formulario. Si falta alguno (ej. un tipo de personal sin indicadores
+                    // configurados todavía, o una competencia sin categoría asignada), se usa
+                    // como respaldo el reparto parejo histórico entre los grupos presentes, para
+                    // que el formulario siempre llegue a sumar 100%.
+                    var gruposCompetencias = competenciasFormulario
                         .GroupBy(c => c.Categoria ?? $"__sin_categoria_{c.IdCompetencia}")
                         .ToList();
-                    var pesoPorGrupo = Math.Round(100m / grupos.Count, 4);
 
-                    foreach (var grupo in grupos)
+                    var clavesPresentes = gruposCompetencias.Select(g => g.Key).ToList();
+                    if (indicadoresFormulario.Count > 0) clavesPresentes.Add(Constantes.CategoriaIndicadoresGestion);
+
+                    var pesosFijos = new Dictionary<string, decimal>
                     {
-                        var pesoPorCompetencia = Math.Round(pesoPorGrupo / grupo.Count(), 2);
+                        [Constantes.CategoriaOrganizacional] = Constantes.PesoOrganizacional,
+                        [Constantes.CategoriaDeRol] = Constantes.PesoDeRol,
+                        [Constantes.CategoriaIndicadoresGestion] = Constantes.PesoIndicadoresGestion,
+                    };
+                    var usaPesosFijos = clavesPresentes.Count == 3 && clavesPresentes.All(pesosFijos.ContainsKey);
+                    var pesoParejo = clavesPresentes.Count > 0 ? Math.Round(100m / clavesPresentes.Count, 4) : 0m;
+
+                    decimal PesoDelGrupo(string clave) => usaPesosFijos ? pesosFijos[clave] : pesoParejo;
+
+                    foreach (var grupo in gruposCompetencias)
+                    {
+                        var pesoGrupo = PesoDelGrupo(grupo.Key);
+                        var pesoPorCompetencia = Math.Round(pesoGrupo / grupo.Count(), 2);
                         foreach (var comp in grupo)
                         {
                             _db.FormularioCompetencias.Add(new FormularioCompetencia
@@ -84,6 +113,26 @@ public class AsignacionService : IAsignacionService
                                 IdFormulario = formulario.IdFormulario,
                                 IdCompetencia = comp.IdCompetencia,
                                 Ponderacion = pesoPorCompetencia,
+                            });
+                        }
+                    }
+
+                    if (indicadoresFormulario.Count > 0)
+                    {
+                        var pesoGrupoIndicadores = PesoDelGrupo(Constantes.CategoriaIndicadoresGestion);
+                        foreach (var ind in indicadoresFormulario)
+                        {
+                            // A diferencia de las competencias (reparto parejo dentro del grupo),
+                            // cada indicador conserva su propia ponderación intra-grupo tal como
+                            // viene configurada (ej. 33.33% cada uno) — no se reparte en partes
+                            // iguales ni se normaliza a que sume 100%, a propósito (ver
+                            // IndicadorGestion.Ponderacion).
+                            var pesoAbsoluto = Math.Round(pesoGrupoIndicadores * (ind.Ponderacion / 100m), 2);
+                            _db.FormularioIndicadores.Add(new FormularioIndicador
+                            {
+                                IdFormulario = formulario.IdFormulario,
+                                IdIndicador = ind.IdIndicador,
+                                Ponderacion = pesoAbsoluto,
                             });
                         }
                     }

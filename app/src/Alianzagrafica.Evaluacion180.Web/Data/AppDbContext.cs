@@ -19,12 +19,15 @@ public class AppDbContext : DbContext
     public DbSet<Usuario> Usuarios { get; set; } = null!;
     public DbSet<UsuarioRol> UsuarioRoles { get; set; } = null!;
     public DbSet<Competencia> Competencias { get; set; } = null!;
+    public DbSet<IndicadorGestion> IndicadoresGestion { get; set; } = null!;
     public DbSet<PeriodoEvaluacion> PeriodosEvaluacion { get; set; } = null!;
     public DbSet<FormularioEvaluacion> FormulariosEvaluacion { get; set; } = null!;
     public DbSet<FormularioCompetencia> FormularioCompetencias { get; set; } = null!;
+    public DbSet<FormularioIndicador> FormularioIndicadores { get; set; } = null!;
     public DbSet<AsignacionEvaluacion> AsignacionesEvaluacion { get; set; } = null!;
     public DbSet<RespuestaEvaluacion> RespuestasEvaluacion { get; set; } = null!;
     public DbSet<RespuestaDetalle> RespuestaDetalles { get; set; } = null!;
+    public DbSet<RespuestaIndicadorDetalle> RespuestaIndicadorDetalles { get; set; } = null!;
     public DbSet<ResultadoConsolidado> ResultadosConsolidados { get; set; } = null!;
     public DbSet<Auditoria> Auditorias { get; set; } = null!;
     public DbSet<ContactoNotificacion> ContactosNotificacion { get; set; } = null!;
@@ -130,6 +133,23 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // ---- IndicadorGestion (Entregable 11 — grupo "Indicadores de Gestión") ----
+        modelBuilder.Entity<IndicadorGestion>(e =>
+        {
+            e.ToTable("IndicadorGestion");
+            e.HasKey(x => x.IdIndicador);
+            e.Property(x => x.IdIndicador).ValueGeneratedOnAdd();
+            e.Property(x => x.Nombre).HasMaxLength(150).IsRequired();
+            e.Property(x => x.Formula).HasMaxLength(400);
+            e.Property(x => x.Ponderacion).HasPrecision(6, 3);
+            e.Property(x => x.Activa).HasDefaultValue(true);
+
+            e.HasOne(x => x.TipoPersonal)
+                .WithMany(t => t.Indicadores)
+                .HasForeignKey(x => x.IdTipoPersonal)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // ---- PeriodoEvaluacion ----
         modelBuilder.Entity<PeriodoEvaluacion>(e =>
         {
@@ -179,6 +199,24 @@ public class AppDbContext : DbContext
                 .OnDelete(DeleteBehavior.Restrict);
         });
 
+        // ---- FormularioIndicador (N:M explícita, con ponderación — Entregable 11) ----
+        modelBuilder.Entity<FormularioIndicador>(e =>
+        {
+            e.ToTable("FormularioIndicador");
+            e.HasKey(x => new { x.IdFormulario, x.IdIndicador });
+            e.Property(x => x.Ponderacion).HasPrecision(5, 2);
+
+            e.HasOne(x => x.Formulario)
+                .WithMany(f => f.FormularioIndicadores)
+                .HasForeignKey(x => x.IdFormulario)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.Indicador)
+                .WithMany(i => i.FormularioIndicadores)
+                .HasForeignKey(x => x.IdIndicador)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
         // ---- AsignacionEvaluacion ----
         modelBuilder.Entity<AsignacionEvaluacion>(e =>
         {
@@ -217,6 +255,9 @@ public class AppDbContext : DbContext
             e.HasKey(x => x.IdRespuesta);
             e.Property(x => x.IdRespuesta).ValueGeneratedOnAdd();
             e.Property(x => x.Estado).HasMaxLength(10).IsRequired().HasDefaultValue(Constantes.RespuestaBorrador);
+            e.Property(x => x.OportunidadesMejora).HasMaxLength(2000);
+            e.Property(x => x.Compromisos).HasMaxLength(2000);
+            e.Property(x => x.RevisionCompromisos).HasMaxLength(2000);
             e.HasIndex(x => x.IdAsignacion).IsUnique();
 
             e.HasOne(x => x.Asignacion)
@@ -240,6 +281,25 @@ public class AppDbContext : DbContext
             e.HasOne(x => x.Competencia)
                 .WithMany()
                 .HasForeignKey(x => x.IdCompetencia)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        // ---- RespuestaIndicadorDetalle (Entregable 11) ----
+        modelBuilder.Entity<RespuestaIndicadorDetalle>(e =>
+        {
+            e.ToTable("RespuestaIndicadorDetalle");
+            e.HasKey(x => new { x.IdRespuesta, x.IdIndicador });
+            e.Property(x => x.Meta).HasPrecision(6, 2);
+            e.Property(x => x.ResultadoMes).HasPrecision(6, 2);
+
+            e.HasOne(x => x.Respuesta)
+                .WithMany(r => r.DetallesIndicadores)
+                .HasForeignKey(x => x.IdRespuesta)
+                .OnDelete(DeleteBehavior.Restrict);
+
+            e.HasOne(x => x.Indicador)
+                .WithMany()
+                .HasForeignKey(x => x.IdIndicador)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

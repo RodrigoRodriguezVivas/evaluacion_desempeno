@@ -40,6 +40,25 @@ public static class Constantes
     public const string CategoriaOrganizacional = "Organizacional";
     public const string CategoriaDeRol = "DeRol";
 
+    // Clave interna del macro-grupo "Indicadores de Gestión" (Entregable 11 — formato real
+    // "EVALUACION DESEMPEÑO Indicadores" de Alianzagrafica). A diferencia de Organizacional/DeRol,
+    // no vive en la columna Competencia.Categoria — es un grupo aparte, de IndicadorGestion, pero
+    // se usa esta misma clave para identificarlo dentro de AsignacionService/Diligenciar.
+    public const string CategoriaIndicadoresGestion = "IndicadoresGestion";
+
+    // Pesos de macro-grupo (RF-07 ampliado en el Entregable 11). Antes de este entregable, los
+    // dos grupos existentes (Organizacional/DeRol) se repartían el 100% en partes iguales
+    // (50%/50%). Desde el Entregable 11, con el grupo "Indicadores de Gestión" incorporado, los
+    // tres macro-grupos tienen pesos FIJOS (no un reparto parejo): Indicadores de Gestión 50%,
+    // Organizacional 20%, De Rol 30% — tomados tal cual del formato real "EVALUACION DESEMPEÑO
+    // Indicadores". Si un formulario no llega a tener los tres grupos presentes (ej. un tipo de
+    // personal sin indicadores configurados todavía), se usa como respaldo el reparto parejo
+    // histórico entre los grupos que sí estén presentes, para no dejar un formulario que nunca
+    // llegue al 100% — ver AsignacionService.GenerarFormulariosAsync.
+    public const decimal PesoIndicadoresGestion = 50m;
+    public const decimal PesoOrganizacional = 20m;
+    public const decimal PesoDeRol = 30m;
+
     // Nombres de tipos de personal (deben coincidir exactamente con la tabla TipoPersonal)
     public const string TipoDirectivo = "Directivo";
     public const string TipoMandoMedio = "Mando medio";

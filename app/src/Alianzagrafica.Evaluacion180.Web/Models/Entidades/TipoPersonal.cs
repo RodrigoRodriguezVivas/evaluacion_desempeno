@@ -9,5 +9,6 @@ public class TipoPersonal
 
     public ICollection<Empleado> Empleados { get; set; } = new List<Empleado>();
     public ICollection<Competencia> Competencias { get; set; } = new List<Competencia>();
+    public ICollection<IndicadorGestion> Indicadores { get; set; } = new List<IndicadorGestion>();
     public ICollection<FormularioEvaluacion> Formularios { get; set; } = new List<FormularioEvaluacion>();
 }
