@@ -88,8 +88,9 @@ if (app.Configuration.GetValue<bool>("Demo:Habilitado"))
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     var hasher = scope.ServiceProvider.GetRequiredService<IPasswordHasher>();
     var asignaciones = scope.ServiceProvider.GetRequiredService<IAsignacionService>();
+    var resultadosDemo = scope.ServiceProvider.GetRequiredService<IResultadoService>();
     await db.Database.EnsureCreatedAsync();
-    await DemoSeed.SembrarSiVacioAsync(db, hasher, asignaciones);
+    await DemoSeed.SembrarSiVacioAsync(db, hasher, asignaciones, resultadosDemo);
 }
 
 // ---- Pipeline HTTP ----

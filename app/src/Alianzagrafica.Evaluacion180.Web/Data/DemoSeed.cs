@@ -21,7 +21,7 @@ public static class DemoSeed
     /// como cualquiera de los usuarios sembrados aquí.</summary>
     public const string ClaveDemoPersonalLocal = "Demo2026*";
 
-    public static async Task SembrarSiVacioAsync(AppDbContext db, IPasswordHasher hasher, IAsignacionService asignaciones)
+    public static async Task SembrarSiVacioAsync(AppDbContext db, IPasswordHasher hasher, IAsignacionService asignaciones, IResultadoService resultados)
     {
         if (await db.TiposPersonal.AnyAsync()) return;
 
@@ -283,6 +283,176 @@ public static class DemoSeed
         // no hay generación de asignaciones "de mentiras" distinta a la de producción.
         await asignaciones.GenerarFormulariosAsync(periodo.IdPeriodo);
         await asignaciones.GenerarAsignacionesAsync(periodo.IdPeriodo);
+
+        // Evaluaciones aleatorias (a pedido del usuario, 27 ago): sin esto, el periodo demo
+        // quedaba con asignaciones creadas pero sin diligenciar, así que Resultados/Reportes se
+        // veían vacíos en el primer arranque. Diligencia y envía TODAS las asignaciones del
+        // periodo con valores aleatorios de distribución realista, y consolida el resultado de
+        // cada evaluado — reutilizando el mismo IResultadoService de producción, igual que el
+        // resto de esta siembra reutiliza AsignacionService.
+        await SembrarEvaluacionesAleatoriasAsync(db, periodo, resultados);
+    }
+
+    /// <summary>
+    /// Diligencia y envía (Estado = Enviada, igual que EvaluacionesController.Enviar) todas las
+    /// asignaciones del periodo demo, con calificaciones de comportamiento e indicadores
+    /// generadas al azar, y consolida el resultado de cada evaluado. Objetivo: que Resultados y
+    /// Reportes (RF-16/RF-17/RF-19) tengan contenido navegable desde el primer arranque de la
+    /// demo, sin depender de que alguien diligencie evaluaciones a mano.
+    ///
+    /// Distribución "realista" (no ruido uniforme 0-100): cada evaluado tiene un nivel de
+    /// desempeño base propio (una muestra normal alrededor de 78%, la zona "Bueno" de
+    /// <see cref="EscalaCalificacion"/>), y cada comportamiento/indicador individual se genera
+    /// alrededor de ese nivel con algo de ruido adicional. Así, en vez de que todos los
+    /// empleados/comportamientos salgan igual de dispersos, cada persona tiende a calificar
+    /// consistentemente (algunas más alto, otras más bajo, unas pocas en banda Deficiente o
+    /// Sobresaliente), como se vería en una evaluación real — útil para probar los reportes
+    /// agregados por área/tipo de personal (RF-17) con datos que no sean todos iguales.
+    ///
+    /// No usa una semilla fija de <see cref="Random"/>: cada vez que la demo se resiembra desde
+    /// cero (base de datos vacía — ver comentario de la clase), genera un conjunto distinto de
+    /// valores, para que la demo no muestre siempre los mismos números.
+    /// </summary>
+    private static async Task SembrarEvaluacionesAleatoriasAsync(AppDbContext db, PeriodoEvaluacion periodo, IResultadoService resultados)
+    {
+        var rnd = new Random();
+        var ahora = DateTime.UtcNow;
+
+        var asignaciones = await db.AsignacionesEvaluacion
+            .Where(a => a.IdPeriodo == periodo.IdPeriodo)
+            .ToListAsync();
+
+        var idsFormulario = asignaciones.Where(a => a.IdFormulario.HasValue).Select(a => a.IdFormulario!.Value).Distinct().ToList();
+
+        var competenciasPorFormulario = await db.FormularioCompetencias
+            .Include(fc => fc.Competencia).ThenInclude(c => c.Comportamientos)
+            .Where(fc => idsFormulario.Contains(fc.IdFormulario))
+            .ToListAsync();
+        var indicadoresPorFormulario = await db.FormularioIndicadores
+            .Include(fi => fi.Indicador)
+            .Where(fi => idsFormulario.Contains(fi.IdFormulario))
+            .ToListAsync();
+
+        // Nivel de desempeño base por evaluado (no por asignación): así, si a la misma persona la
+        // evalúan varios evaluadores (autoevaluación + jefe, o también ascendente), sus resultados
+        // quedan en un rango coherente entre sí, en vez de completamente descorrelacionados.
+        var nivelBasePorEvaluado = asignaciones
+            .Select(a => a.CodigoEvaluado)
+            .Distinct()
+            .ToDictionary(codigo => codigo, _ => Math.Clamp(78.0 + MuestraNormal(rnd) * 10.0, 45.0, 96.0));
+
+        // Textos de ejemplo para la sección "Compromisos" (Entregable 11) — variados, no siempre
+        // el mismo texto, para que se vea contenido real al revisar varias evaluaciones seguidas.
+        string[] oportunidades = {
+            "Reforzar el manejo del tiempo en tareas de mayor complejidad.",
+            "Profundizar en el conocimiento de los procedimientos internos del área.",
+            "Mejorar la comunicación proactiva con otras áreas involucradas en el proceso.",
+            "Fortalecer el registro y documentación de las actividades diarias.",
+        };
+        string[] compromisosTexto = {
+            "Participar en la próxima capacitación programada por Gestión Humana.",
+            "Aplicar la lista de verificación acordada antes de cerrar cada orden de producción.",
+            "Reunirse quincenalmente con el jefe directo para revisar avances.",
+            "Actualizar el registro de actividades al finalizar cada turno.",
+        };
+        string[] revisiones = {
+            "Compromiso cumplido durante el periodo, con seguimiento del jefe directo.",
+            "En progreso; se evidencian avances frente al periodo anterior.",
+            "Pendiente de verificar en el próximo corte del periodo.",
+        };
+
+        foreach (var asignacion in asignaciones)
+        {
+            var respuesta = new RespuestaEvaluacion
+            {
+                IdAsignacion = asignacion.IdAsignacion,
+                Estado = Constantes.RespuestaEnviada,
+                FechaEnvio = ahora,
+                OportunidadesMejora = oportunidades[rnd.Next(oportunidades.Length)],
+                Compromisos = compromisosTexto[rnd.Next(compromisosTexto.Length)],
+                RevisionCompromisos = revisiones[rnd.Next(revisiones.Length)],
+            };
+            db.RespuestasEvaluacion.Add(respuesta);
+            await db.SaveChangesAsync(); // asigna IdRespuesta para enlazar detalles
+
+            var nivelBase = asignacion.IdFormulario.HasValue
+                ? nivelBasePorEvaluado[asignacion.CodigoEvaluado]
+                : 78.0;
+
+            if (asignacion.IdFormulario is int idFormulario)
+            {
+                foreach (var fc in competenciasPorFormulario.Where(fc => fc.IdFormulario == idFormulario))
+                {
+                    var comportamientosActivos = fc.Competencia.Comportamientos.Where(cp => cp.Activo).ToList();
+                    var calificacionesComportamientos = new List<decimal>();
+
+                    foreach (var comportamiento in comportamientosActivos)
+                    {
+                        var valor = ValorAleatorioRealista(rnd, nivelBase);
+                        calificacionesComportamientos.Add(valor);
+                        db.RespuestaComportamientoDetalles.Add(new RespuestaComportamientoDetalle
+                        {
+                            IdRespuesta = respuesta.IdRespuesta,
+                            IdComportamiento = comportamiento.IdComportamiento,
+                            Calificacion = valor,
+                        });
+                    }
+
+                    // Misma fórmula que EvaluacionesController.Guardar: la "NOTA FINAL" de la
+                    // competencia es el promedio de sus comportamientos, calculado aquí igual que
+                    // lo calcularía el servidor al recibir el formulario diligenciado a mano.
+                    if (calificacionesComportamientos.Count == 0) continue;
+                    db.RespuestaDetalles.Add(new RespuestaDetalle
+                    {
+                        IdRespuesta = respuesta.IdRespuesta,
+                        IdCompetencia = fc.IdCompetencia,
+                        Calificacion = Math.Round(calificacionesComportamientos.Average(), 2),
+                    });
+                }
+
+                foreach (var fi in indicadoresPorFormulario.Where(fi => fi.IdFormulario == idFormulario))
+                {
+                    db.RespuestaIndicadorDetalles.Add(new RespuestaIndicadorDetalle
+                    {
+                        IdRespuesta = respuesta.IdRespuesta,
+                        IdIndicador = fi.IdIndicador,
+                        Meta = fi.Indicador.Meta,
+                        ResultadoMes = ValorAleatorioRealista(rnd, nivelBase),
+                    });
+                }
+            }
+
+            asignacion.Estado = Constantes.AsignacionCompletada;
+        }
+
+        await db.SaveChangesAsync();
+
+        // Consolida el resultado de cada evaluado (mismo servicio que usa
+        // EvaluacionesController.Enviar tras cada envío individual) — con todas las asignaciones
+        // del periodo ya completadas arriba, cada evaluado queda con su ResultadoConsolidado
+        // (autoevaluación / jefe / ascendente / general) listo para verse en Resultados/Reportes.
+        foreach (var codigoEvaluado in asignaciones.Select(a => a.CodigoEvaluado).Distinct())
+        {
+            await resultados.ConsolidarSiCompletoAsync(codigoEvaluado, periodo.IdPeriodo);
+        }
+    }
+
+    /// <summary>Muestra de una distribución normal estándar (media 0, desviación 1) usando la
+    /// transformación de Box-Muller, a partir del generador uniforme de <see cref="Random"/>.</summary>
+    private static double MuestraNormal(Random rnd)
+    {
+        var u1 = 1.0 - rnd.NextDouble(); // evita log(0)
+        var u2 = rnd.NextDouble();
+        return Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
+    }
+
+    /// <summary>Calificación aleatoria en puntos porcentuales (0-100), alrededor del nivel base
+    /// del evaluado (ver <see cref="SembrarEvaluacionesAleatoriasAsync"/>), con ruido adicional
+    /// por ítem individual (desviación 7) y recortada al rango válido.</summary>
+    private static decimal ValorAleatorioRealista(Random rnd, double nivelBase)
+    {
+        var valor = Math.Clamp(nivelBase + MuestraNormal(rnd) * 7.0, 0.0, 100.0);
+        return Math.Round((decimal)valor, 2);
     }
 
     private static Empleado NuevoEmpleado(int codigo, string nombre, string cargo, string area, TipoPersonal tipo, int? jefe, string correo, DateTime hoy, DateTime ahora) => new()
