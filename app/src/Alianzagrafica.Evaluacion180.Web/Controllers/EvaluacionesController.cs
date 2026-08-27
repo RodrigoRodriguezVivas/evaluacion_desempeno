@@ -75,6 +75,7 @@ public class EvaluacionesController : Controller
         var competenciasFormulario = asignacion.IdFormulario is int idFormulario
             ? await _db.FormularioCompetencias
                 .Include(fc => fc.Competencia)
+                    .ThenInclude(c => c.Comportamientos)
                 .Where(fc => fc.IdFormulario == idFormulario)
                 // Ordenar por categoría primero para que los macro-grupos (Organizacional / De
                 // Rol) queden agrupados de forma contigua al mostrar el formulario.
@@ -95,10 +96,12 @@ public class EvaluacionesController : Controller
 
         var respuesta = await _db.RespuestasEvaluacion
             .Include(r => r.Detalles)
+            .Include(r => r.DetallesComportamientos)
             .Include(r => r.DetallesIndicadores)
             .FirstOrDefaultAsync(r => r.IdAsignacion == id);
 
         var detallesPorCompetencia = respuesta?.Detalles.ToDictionary(d => d.IdCompetencia) ?? new Dictionary<int, RespuestaDetalle>();
+        var detallesPorComportamiento = respuesta?.DetallesComportamientos.ToDictionary(d => d.IdComportamiento) ?? new Dictionary<int, RespuestaComportamientoDetalle>();
         var detallesPorIndicador = respuesta?.DetallesIndicadores.ToDictionary(d => d.IdIndicador) ?? new Dictionary<int, RespuestaIndicadorDetalle>();
 
         var modelo = new DiligenciarEvaluacionViewModel
@@ -117,8 +120,22 @@ public class EvaluacionesController : Controller
                 Descripcion = fc.Competencia.Descripcion,
                 Categoria = fc.Competencia.Categoria,
                 Ponderacion = fc.Ponderacion,
+                // "NOTA FINAL" de la competencia: valor ya calculado y guardado (promedio de sus
+                // comportamientos) — ver EvaluacionesController.Guardar y
+                // ItemCompetenciaViewModel.Calificacion.
                 Calificacion = detallesPorCompetencia.TryGetValue(fc.IdCompetencia, out var d) ? d.Calificacion : null,
                 Comentario = detallesPorCompetencia.TryGetValue(fc.IdCompetencia, out var d2) ? d2.Comentario : null,
+                // Comportamientos de la competencia (Entregable 13), en el orden del catálogo,
+                // con la calificación ya guardada de cada uno (si existe).
+                Comportamientos = fc.Competencia.Comportamientos
+                    .Where(cp => cp.Activo)
+                    .OrderBy(cp => cp.Orden)
+                    .Select(cp => new ItemComportamientoViewModel
+                    {
+                        IdComportamiento = cp.IdComportamiento,
+                        Descripcion = cp.Descripcion,
+                        Calificacion = detallesPorComportamiento.TryGetValue(cp.IdComportamiento, out var dc) ? dc.Calificacion : null,
+                    }).ToList(),
             }).ToList(),
             Indicadores = indicadoresFormulario.Select(fi => new ItemIndicadorViewModel
             {
@@ -148,9 +165,13 @@ public class EvaluacionesController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Enviar(DiligenciarEvaluacionViewModel modelo)
     {
-        if (modelo.Items.Any(i => i.Calificacion is null))
+        // Desde el Entregable 13, la "NOTA FINAL" de cada competencia (Calificacion) ya no la
+        // escribe el evaluador directamente: se calcula del promedio de sus comportamientos. Por
+        // eso, para el envío definitivo, se exige que TODOS los comportamientos de TODAS las
+        // competencias estén calificados (antes se exigía Calificacion de la competencia).
+        if (modelo.Items.Any(i => i.Comportamientos.Any(c => c.Calificacion is null)))
         {
-            ModelState.AddModelError(string.Empty, "Debes calificar todas las competencias antes de enviar la evaluación de forma definitiva.");
+            ModelState.AddModelError(string.Empty, "Debes calificar todos los comportamientos de cada competencia antes de enviar la evaluación de forma definitiva.");
             modelo.SoloLectura = false;
             return View("Diligenciar", modelo);
         }
@@ -176,6 +197,7 @@ public class EvaluacionesController : Controller
 
         var respuesta = await _db.RespuestasEvaluacion
             .Include(r => r.Detalles)
+            .Include(r => r.DetallesComportamientos)
             .Include(r => r.DetallesIndicadores)
             .FirstOrDefaultAsync(r => r.IdAsignacion == asignacion.IdAsignacion);
 
@@ -187,14 +209,44 @@ public class EvaluacionesController : Controller
         }
 
         var detallesExistentes = respuesta.Detalles.ToDictionary(d => d.IdCompetencia);
+        var detallesComportamientoExistentes = respuesta.DetallesComportamientos.ToDictionary(d => d.IdComportamiento);
 
         foreach (var item in modelo.Items)
         {
-            if (item.Calificacion is null) continue;
+            // Comportamientos (Entregable 13) — se guarda cada calificación individual recibida
+            // (puede quedar incompleta en un borrador).
+            var comportamientosConValor = item.Comportamientos.Where(c => c.Calificacion.HasValue).ToList();
+            foreach (var comp in comportamientosConValor)
+            {
+                if (detallesComportamientoExistentes.TryGetValue(comp.IdComportamiento, out var detalleComp))
+                {
+                    detalleComp.Calificacion = comp.Calificacion!.Value;
+                }
+                else
+                {
+                    _db.RespuestaComportamientoDetalles.Add(new RespuestaComportamientoDetalle
+                    {
+                        IdRespuesta = respuesta.IdRespuesta,
+                        IdComportamiento = comp.IdComportamiento,
+                        Calificacion = comp.Calificacion!.Value,
+                    });
+                }
+            }
+
+            // "NOTA FINAL" de la competencia = promedio de los comportamientos YA calificados
+            // (igual que =AVERAGE(...) en el Excel origen, que ignora las celdas sin diligenciar),
+            // calculado siempre en el servidor a partir de lo que se acaba de guardar arriba —
+            // nunca a partir de un total que venga directamente en el formulario posteado (mismo
+            // criterio de autoridad del servidor que la Meta de los indicadores, Entregable 12).
+            // Si todavía no se ha calificado ningún comportamiento de esta competencia, no se
+            // guarda RespuestaDetalle (la competencia queda pendiente, como antes).
+            if (comportamientosConValor.Count == 0) continue;
+
+            var promedioCompetencia = Math.Round(comportamientosConValor.Average(c => c.Calificacion!.Value), 2);
 
             if (detallesExistentes.TryGetValue(item.IdCompetencia, out var detalle))
             {
-                detalle.Calificacion = item.Calificacion.Value;
+                detalle.Calificacion = promedioCompetencia;
                 detalle.Comentario = item.Comentario;
             }
             else
@@ -203,7 +255,7 @@ public class EvaluacionesController : Controller
                 {
                     IdRespuesta = respuesta.IdRespuesta,
                     IdCompetencia = item.IdCompetencia,
-                    Calificacion = item.Calificacion.Value,
+                    Calificacion = promedioCompetencia,
                     Comentario = item.Comentario,
                 });
             }

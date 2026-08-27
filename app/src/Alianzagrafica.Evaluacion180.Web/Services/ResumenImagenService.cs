@@ -35,15 +35,15 @@ public class ResumenImagenService : IResumenImagenService
     private static readonly Color ColorGrisClaro = Color.ParseHex("F2F2F2");
     private static readonly Color ColorBordeSuave = Color.ParseHex("DDE3EC");
 
-    // Bandas de desempeño equivalentes al formato interno GHU-FOR-007 (misma nota que se
-    // muestra en Views/Evaluaciones/Diligenciar.cshtml): 1-2≈Deficiente, 3≈Aceptable,
-    // 4≈Bueno, 5≈Sobresaliente. Para un promedio decimal continuo se usan estos puntos de
-    // corte, redondeando al punto medio entre bandas.
-    private static (string Nombre, Color Color) Banda(decimal promedio) => promedio switch
+    // Bandas de desempeño del formato interno GHU-FOR-007 (Entregable 12: el % es la escala
+    // NATIVA de calificación desde este entregable, ya no una equivalencia informativa de la
+    // escala 1-5 — ver Models/Entidades/EscalaCalificacion.cs, que centraliza los mismos puntos
+    // de corte reutilizados aquí, en Diligenciar.cshtml y en Resultados/Reportes.cshtml).
+    private static (string Nombre, Color Color) Banda(decimal porcentaje) => EscalaCalificacion.Clasificar(porcentaje) switch
     {
-        < 2.5m => ("Deficiente", Color.ParseHex("C0392B")),
-        < 3.5m => ("Aceptable", Color.ParseHex("BF8F00")),
-        < 4.5m => ("Bueno", Color.ParseHex("2E7D32")),
+        "Deficiente" => ("Deficiente", Color.ParseHex("C0392B")),
+        "Aceptable" => ("Aceptable", Color.ParseHex("BF8F00")),
+        "Bueno" => ("Bueno", Color.ParseHex("2E7D32")),
         _ => ("Sobresaliente", Color.ParseHex("1B5E20")),
     };
 
@@ -127,13 +127,13 @@ public class ResumenImagenService : IResumenImagenService
 
         imagen.Mutate(ctx => ctx.Fill(ColorGrisClaro, new RectangleF(40, y, Ancho - 80, 150)));
         imagen.Mutate(ctx => ctx.DrawText("PROMEDIO GENERAL", fuenteEtiqueta, ColorGrisTexto, new PointF(64, y + 20)));
-        imagen.Mutate(ctx => ctx.DrawText(promedioGeneral.ToString("0.00"), fuenteValorGrande, ColorNavy, new PointF(64, y + 44)));
+        imagen.Mutate(ctx => ctx.DrawText(promedioGeneral.ToString("0.0") + "%", fuenteValorGrande, ColorNavy, new PointF(64, y + 44)));
 
         var anchoEtiquetaBanda = TextMeasurer.MeasureSize(nombreBanda, new TextOptions(fuenteBanda)).Width + 28;
         imagen.Mutate(ctx => ctx.Fill(colorBanda, new RectangleF(Ancho - 64 - anchoEtiquetaBanda, y + 55, anchoEtiquetaBanda, 40)));
         imagen.Mutate(ctx => ctx.DrawText(nombreBanda, fuenteBanda, Color.White, new PointF(Ancho - 50 - anchoEtiquetaBanda, y + 65)));
 
-        imagen.Mutate(ctx => ctx.DrawText("Escala 1-5 · equivalente GHU-FOR-007: 0-59% Deficiente · 60-79% Aceptable · 80-90% Bueno · 91-100% Sobresaliente",
+        imagen.Mutate(ctx => ctx.DrawText("Escala 0-100% · equivalente GHU-FOR-007: 0-59% Deficiente · 60-79% Aceptable · 80-90% Bueno · 91-100% Sobresaliente",
             fuentePie, ColorGrisTexto, new PointF(64, y + 118)));
 
         y += 150 + 30;
@@ -150,7 +150,7 @@ public class ResumenImagenService : IResumenImagenService
         {
             var x = 40 + i * anchoColumna;
             var (etiqueta, valor) = subPromedios[i];
-            var texto = valor?.ToString("0.00") ?? "—";
+            var texto = valor is decimal v ? v.ToString("0.0") + "%" : "—";
             imagen.Mutate(ctx => ctx.DrawText(texto, fuenteStat, ColorNavy, new PointF(x, y)));
             imagen.Mutate(ctx => ctx.DrawText(etiqueta, fuenteStatEtiqueta, ColorGrisTexto, new PointF(x, y + 30)));
         }
@@ -172,10 +172,10 @@ public class ResumenImagenService : IResumenImagenService
                 imagen.Mutate(ctx => ctx.DrawText(Truncar(nombre, 48), fuenteCompetencia, ColorGrisTexto, new PointF(40, y)));
 
                 var anchoFondo = anchoBarraMax;
-                var anchoValor = (float)(anchoBarraMax * Math.Min(1m, promedio / 5m));
+                var anchoValor = (float)(anchoBarraMax * Math.Min(1m, promedio / 100m));
                 imagen.Mutate(ctx => ctx.Fill(ColorGrisClaro, new RectangleF(340, y + 2, anchoFondo, 18)));
                 imagen.Mutate(ctx => ctx.Fill(colorBarra, new RectangleF(340, y + 2, anchoValor, 18)));
-                imagen.Mutate(ctx => ctx.DrawText(promedio.ToString("0.0"), fuenteCompetenciaValor, ColorGrisTexto, new PointF(340 + anchoBarraMax + 12, y)));
+                imagen.Mutate(ctx => ctx.DrawText(promedio.ToString("0.0") + "%", fuenteCompetenciaValor, ColorGrisTexto, new PointF(340 + anchoBarraMax + 12, y)));
 
                 y += 40;
             }
@@ -215,7 +215,7 @@ public class ResumenImagenService : IResumenImagenService
 
         return detalles
             .GroupBy(d => d.Competencia.Nombre)
-            .Select(g => (Nombre: g.Key, Promedio: Math.Round(g.Average(d => (decimal)d.Calificacion), 2)))
+            .Select(g => (Nombre: g.Key, Promedio: Math.Round(g.Average(d => d.Calificacion), 2)))
             .OrderByDescending(c => c.Promedio)
             .ToList();
     }

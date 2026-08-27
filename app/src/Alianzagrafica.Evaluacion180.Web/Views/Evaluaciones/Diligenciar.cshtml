@@ -190,15 +190,23 @@ else
         @if (Model.Items.Count > 0)
         {
             <h2 class="h5 mt-4">Competencias</h2>
+            <p class="escala-ayuda small text-muted">
+                Cada competencia se despliega en sus comportamientos observables (columna "COMPORTAMIENTOS" del
+                formato interno). Califica cada comportamiento por separado, de 0% a 100%; la "Nota final" de la
+                competencia es el promedio de sus comportamientos ya calificados — se calcula automáticamente, no
+                se diligencia directamente.
+            </p>
             <div class="table-responsive">
                 <table class="table tabla-competencias bg-white align-middle">
                     <thead>
                         <tr>
-                            <th style="width: 22%">Competencia</th>
-                            <th>Descripción</th>
-                            <th style="width: 10%">Ponderación</th>
-                            <th style="width: 12%">Calificación (%)</th>
-                            <th style="width: 24%">Comentario</th>
+                            <th style="width: 15%">Competencia</th>
+                            <th style="width: 19%">Descripción</th>
+                            <th>Comportamiento</th>
+                            <th style="width: 11%">Nota individual (%)</th>
+                            <th style="width: 9%">Nota final</th>
+                            <th style="width: 7%">Ponderación</th>
+                            <th style="width: 16%">Comentario</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -210,49 +218,82 @@ else
                             if (etiquetaGrupo is not null)
                             {
                                 <tr class="table-secondary">
-                                    <th colspan="5" class="small text-uppercase">
+                                    <th colspan="7" class="small text-uppercase">
                                         @etiquetaGrupo.ToUpperInvariant() (@pesoGrupo.ToString("0.##")% del total)
                                     </th>
                                 </tr>
                             }
                             @foreach (var (item, idx) in grupo)
                             {
-                                <tr data-categoria="@(item.Categoria ?? "")" data-ponderacion="@item.Ponderacion.ToString(System.Globalization.CultureInfo.InvariantCulture)">
-                                    <td>
-                                        <strong>@Model.Items[idx].Nombre</strong>
-                                        <input type="hidden" asp-for="Items[idx].IdCompetencia" />
-                                        <input type="hidden" asp-for="Items[idx].Nombre" />
-                                        <input type="hidden" asp-for="Items[idx].Categoria" />
-                                        <input type="hidden" asp-for="Items[idx].Ponderacion" />
-                                    </td>
-                                    <td class="small text-muted">@Model.Items[idx].Descripcion</td>
-                                    <td>@Model.Items[idx].Ponderacion%</td>
-                                    <td>
-                                        @if (Model.SoloLectura)
+                                var comportamientos = Model.Items[idx].Comportamientos;
+                                var filas = comportamientos.Count > 0 ? comportamientos.Count : 1;
+                                for (var cIdx = 0; cIdx < filas; cIdx++)
+                                {
+                                    var comportamiento = cIdx < comportamientos.Count ? comportamientos[cIdx] : null;
+                                    <tr data-categoria="@(item.Categoria ?? "")">
+                                        @if (cIdx == 0)
                                         {
-                                            <span class="fw-bold">@(Model.Items[idx].Calificacion is decimal c ? c.ToString("0.##") + "%" : "—")</span>
+                                            <td rowspan="@filas">
+                                                <strong>@Model.Items[idx].Nombre</strong>
+                                                <input type="hidden" asp-for="Items[idx].IdCompetencia" />
+                                                <input type="hidden" asp-for="Items[idx].Nombre" />
+                                                <input type="hidden" asp-for="Items[idx].Categoria" />
+                                                <input type="hidden" asp-for="Items[idx].Ponderacion" />
+                                            </td>
+                                            <td rowspan="@filas" class="small text-muted">@Model.Items[idx].Descripcion</td>
+                                        }
+                                        @if (comportamiento is not null)
+                                        {
+                                            <td class="small">
+                                                @comportamiento.Descripcion
+                                                <input type="hidden" asp-for="Items[idx].Comportamientos[cIdx].IdComportamiento" />
+                                                <input type="hidden" asp-for="Items[idx].Comportamientos[cIdx].Descripcion" />
+                                            </td>
+                                            <td>
+                                                @if (Model.SoloLectura)
+                                                {
+                                                    <span class="fw-bold">@(comportamiento.Calificacion is decimal cc ? cc.ToString("0.##") + "%" : "—")</span>
+                                                }
+                                                else
+                                                {
+                                                    <input type="number" step="0.01" min="0" max="100"
+                                                           asp-for="Items[idx].Comportamientos[cIdx].Calificacion"
+                                                           class="form-control form-control-sm"
+                                                           data-comportamiento="1" data-competencia-idx="@idx"
+                                                           placeholder="0-100" />
+                                                }
+                                            </td>
                                         }
                                         else
                                         {
-                                            <input type="number" step="0.01" min="0" max="100" asp-for="Items[idx].Calificacion" class="form-control form-control-sm" data-calificacion="1" placeholder="0-100" />
+                                            <td class="small text-muted">(sin comportamientos configurados)</td>
+                                            <td>—</td>
                                         }
-                                    </td>
-                                    <td>
-                                        @if (Model.SoloLectura)
+                                        @if (cIdx == 0)
                                         {
-                                            <span class="small">@Model.Items[idx].Comentario</span>
+                                            <td rowspan="@filas" class="fw-bold nota-final-competencia" data-nota-final-competencia="@idx"
+                                                data-categoria="@(item.Categoria ?? "")" data-ponderacion="@item.Ponderacion.ToString(System.Globalization.CultureInfo.InvariantCulture)">
+                                                @(Model.Items[idx].Calificacion is decimal c ? c.ToString("0.##") + "%" : "—")
+                                            </td>
+                                            <td rowspan="@filas">@Model.Items[idx].Ponderacion%</td>
+                                            <td rowspan="@filas">
+                                                @if (Model.SoloLectura)
+                                                {
+                                                    <span class="small">@Model.Items[idx].Comentario</span>
+                                                }
+                                                else
+                                                {
+                                                    <textarea asp-for="Items[idx].Comentario" class="form-control form-control-sm" rows="2"></textarea>
+                                                }
+                                            </td>
                                         }
-                                        else
-                                        {
-                                            <textarea asp-for="Items[idx].Comentario" class="form-control form-control-sm" rows="2"></textarea>
-                                        }
-                                    </td>
-                                </tr>
+                                    </tr>
+                                }
                             }
                             @if (etiquetaGrupo is not null)
                             {
                                 <tr class="table-light fw-semibold" data-subtotal-grupo="@grupo.Key">
-                                    <td colspan="3" class="text-end">Subtotal — @etiquetaGrupo</td>
+                                    <td colspan="5" class="text-end">Subtotal — @etiquetaGrupo</td>
                                     <td colspan="2" class="subtotal-valor">
                                         @(subtotalGrupo is not null ? ConBanda(subtotalGrupo) : "— (faltan calificaciones)")
                                     </td>
@@ -358,21 +399,42 @@ else
                         function recalcular() {
                             var sumaPesoTotal = 0, sumaPonderadaTotal = 0;
 
-                            // Competencias, por macro-grupo (Organizacional / DeRol)
-                            var gruposCompetencias = {};
-                            document.querySelectorAll('#formEvaluacion tr[data-categoria]').forEach(function (fila) {
-                                var categoria = fila.getAttribute('data-categoria');
-                                if (categoria !== 'Organizacional' && categoria !== 'DeRol') return;
-                                var ponderacion = parseFloat(fila.getAttribute('data-ponderacion')) || 0;
-                                var input = fila.querySelector('input[data-calificacion]');
-                                var valor = input ? input.value : '';
+                            // Paso 1: promedio por competencia, a partir de sus comportamientos ya
+                            // calificados (ignora los comportamientos en blanco, igual que
+                            // =AVERAGE(...) en el Excel origen). Agrupa por data-competencia-idx.
+                            var comportamientosPorCompetencia = {};
+                            document.querySelectorAll('#formEvaluacion input[data-comportamiento]').forEach(function (input) {
+                                var idx = input.getAttribute('data-competencia-idx');
+                                if (input.value === '') return;
+                                if (!comportamientosPorCompetencia[idx]) comportamientosPorCompetencia[idx] = [];
+                                comportamientosPorCompetencia[idx].push(parseFloat(input.value));
+                            });
+                            var promedioPorCompetencia = {};
+                            Object.keys(comportamientosPorCompetencia).forEach(function (idx) {
+                                var valores = comportamientosPorCompetencia[idx];
+                                var suma = valores.reduce(function (a, b) { return a + b; }, 0);
+                                promedioPorCompetencia[idx] = suma / valores.length;
+                            });
 
+                            // Paso 2: refleja la "Nota final" de cada competencia en su celda, y
+                            // acumula por macro-grupo (Organizacional / DeRol) usando la
+                            // ponderación de la competencia UNA sola vez (no por comportamiento).
+                            var gruposCompetencias = {};
+                            document.querySelectorAll('#formEvaluacion [data-nota-final-competencia]').forEach(function (celda) {
+                                var idx = celda.getAttribute('data-nota-final-competencia');
+                                var categoria = celda.getAttribute('data-categoria');
+                                var ponderacion = parseFloat(celda.getAttribute('data-ponderacion')) || 0;
+                                var promedio = promedioPorCompetencia[idx];
+
+                                celda.textContent = (promedio !== undefined) ? (promedio.toFixed(2) + '%') : '—';
+
+                                if (categoria !== 'Organizacional' && categoria !== 'DeRol') return;
                                 if (!gruposCompetencias[categoria]) gruposCompetencias[categoria] = { sumaPeso: 0, sumaPonderada: 0 };
-                                if (valor !== '') {
+                                if (promedio !== undefined) {
                                     gruposCompetencias[categoria].sumaPeso += ponderacion;
-                                    gruposCompetencias[categoria].sumaPonderada += ponderacion * parseFloat(valor);
+                                    gruposCompetencias[categoria].sumaPonderada += ponderacion * promedio;
                                     sumaPesoTotal += ponderacion;
-                                    sumaPonderadaTotal += ponderacion * parseFloat(valor);
+                                    sumaPonderadaTotal += ponderacion * promedio;
                                 }
                             });
                             Object.keys(gruposCompetencias).forEach(function (categoria) {
@@ -414,7 +476,7 @@ else
                             }
                         }
 
-                        document.querySelectorAll('#formEvaluacion input[data-calificacion]').forEach(function (input) {
+                        document.querySelectorAll('#formEvaluacion input[data-comportamiento]').forEach(function (input) {
                             input.addEventListener('input', recalcular);
                             input.addEventListener('change', recalcular);
                         });

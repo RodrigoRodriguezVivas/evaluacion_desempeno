@@ -4,6 +4,10 @@
     // El envío de resultados (RF-23) está restringido a GH/Sistema — Consulta Directiva puede
     // ver este reporte pero no dispara envíos.
     var puedeEnviarResultado = User.IsInRole(Constantes.RolAdministradorGestionHumana) || User.IsInRole(Constantes.RolAdministradorSistema);
+
+    // Entregable 12: promedio general en % (0-100), igual que en Mios.cshtml — se muestra con el
+    // símbolo % y con la banda cualitativa de EscalaCalificacion.
+    string ConPorcentaje(decimal? valor) => valor.HasValue ? valor.Value.ToString("0.00") + "%" : "—";
 }
 
 <h1 class="h3 mt-4 mb-1">Reportes — @(Model.PeriodoNombre ?? "sin periodo")</h1>
@@ -47,7 +51,7 @@ else
     </div>
 
     <h2 class="h5">Resultados consolidados</h2>
-    <p class="small text-muted">Se resalta en rojo a quienes tienen promedio general por debajo de @Model.UmbralAlerta (RF-18).</p>
+    <p class="small text-muted">Se resalta en rojo a quienes tienen promedio general por debajo de @(Model.UmbralAlerta.ToString("0"))% (RF-18).</p>
     <div class="table-responsive">
         <table class="table bg-white align-middle">
             <thead>
@@ -57,6 +61,7 @@ else
                     <th>Tipo de personal</th>
                     <th>Área</th>
                     <th>Promedio general</th>
+                    <th>Resultado</th>
                     @if (puedeEnviarResultado)
                     {
                         <th>Acciones</th>
@@ -72,7 +77,17 @@ else
                         <td>@r.Cargo</td>
                         <td>@r.TipoPersonal</td>
                         <td>@r.Area</td>
-                        <td><strong>@(r.PromedioGeneral?.ToString("0.00") ?? "—")</strong></td>
+                        <td><strong>@ConPorcentaje(r.PromedioGeneral)</strong></td>
+                        <td>
+                            @if (r.PromedioGeneral is decimal pg)
+                            {
+                                <span class="badge @EscalaCalificacion.ClaseBadge(pg)">@EscalaCalificacion.Clasificar(pg)</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
                         @if (puedeEnviarResultado)
                         {
                             <td>
@@ -90,7 +105,7 @@ else
                 }
                 @if (Model.Resultados.Count == 0)
                 {
-                    <tr><td colspan="@(puedeEnviarResultado ? 6 : 5)" class="text-muted text-center py-3">Todavía no hay resultados consolidados para este periodo.</td></tr>
+                    <tr><td colspan="@(puedeEnviarResultado ? 7 : 6)" class="text-muted text-center py-3">Todavía no hay resultados consolidados para este periodo.</td></tr>
                 }
             </tbody>
         </table>

@@ -1,6 +1,12 @@
 @model MisResultadosViewModel
 @{
     ViewData["Title"] = "Mis resultados";
+
+    // Entregable 12: los promedios ya están en % (0-100), igual que las calificaciones
+    // individuales de la evaluación — se muestran con el símbolo % y, junto al promedio
+    // general, con la banda cualitativa de EscalaCalificacion (Deficiente/Aceptable/Bueno/
+    // Sobresaliente), igual que en Diligenciar.cshtml y en el resumen-imagen de WhatsApp/correo.
+    string ConPorcentaje(decimal? valor) => valor.HasValue ? valor.Value.ToString("0.00") + "%" : "—";
 }
 
 <h1 class="h3 mt-4 mb-4">Mis resultados — @Model.NombreEmpleado</h1>
@@ -20,6 +26,7 @@ else
                     <th>Evaluación del jefe</th>
                     <th>Evaluación ascendente</th>
                     <th>Promedio general</th>
+                    <th>Resultado</th>
                     <th>Consolidado el</th>
                 </tr>
             </thead>
@@ -28,10 +35,20 @@ else
                 {
                     <tr>
                         <td>@r.PeriodoNombre</td>
-                        <td>@(r.PromedioAutoevaluacion?.ToString("0.00") ?? "—")</td>
-                        <td>@(r.PromedioJefe?.ToString("0.00") ?? "—")</td>
-                        <td>@(r.PromedioAscendente?.ToString("0.00") ?? "—")</td>
-                        <td><strong>@(r.PromedioGeneral?.ToString("0.00") ?? "—")</strong></td>
+                        <td>@ConPorcentaje(r.PromedioAutoevaluacion)</td>
+                        <td>@ConPorcentaje(r.PromedioJefe)</td>
+                        <td>@ConPorcentaje(r.PromedioAscendente)</td>
+                        <td><strong>@ConPorcentaje(r.PromedioGeneral)</strong></td>
+                        <td>
+                            @if (r.PromedioGeneral is decimal pg)
+                            {
+                                <span class="badge @EscalaCalificacion.ClaseBadge(pg)">@EscalaCalificacion.Clasificar(pg)</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">—</span>
+                            }
+                        </td>
                         <td class="small text-muted">@(r.FechaConsolidacion?.ToString("dd/MM/yyyy") ?? "—")</td>
                     </tr>
                 }

@@ -114,156 +114,111 @@ public static class DemoSeed
             new UsuarioRol { IdUsuario = usuarioConductor.IdUsuario, IdRol = rolColaborador.IdRol });
         await db.SaveChangesAsync();
 
-        // ---- Competencias (genéricas + específicas por tipo de personal) ----
-        // Las 4 competencias "organizacionales" (genéricas) y las 5 competencias de "rol" del
-        // Conductor se tomaron, con su nombre y definición, del formato real de evaluación de
-        // desempeño de Alianzagrafica (código interno GHU-FOR-007 — hoja de cálculo que hoy se
-        // diligencia manualmente por colaborador). No se usó ningún dato de personas reales
-        // (nombres de trabajadores ni calificaciones) de ese archivo — solo la estructura de
-        // competencias y sus definiciones, que son las mismas para cualquier colaborador del
-        // cargo, no información personal.
+        // ---- Competencias y comportamientos (Entregable 13) ----
+        // Reemplaza el catálogo anterior (competencias específicas por tipo de personal —
+        // "Visión estratégica" del Directivo, "Liderazgo de equipos" del Mando medio, las 6 del
+        // Conductor, etc.) por el del formato real "EVALUACION DESEMPEÑO_Evaluaciones" de
+        // Alianzagrafica (Excel adjuntado por el usuario), que desglosa cada competencia en sus
+        // comportamientos observables (columna "COMPORTAMIENTOS"). A pedido explícito del usuario
+        // ("mismo listado para todos los perfiles"), es un catálogo ÚNICO y genérico
+        // (IdTipoPersonal = null): las mismas 6 competencias (3 Organizacional + 3 DeRol) y sus 20
+        // comportamientos aplican igual a los seis tipos de personal (Directivo, Mando medio,
+        // Administrativo, Operario, Auxiliar de planta, Conductor). No se usó ningún dato de
+        // personas reales del Excel (nombres ni calificaciones) — solo la estructura de
+        // competencias/comportamientos y sus definiciones.
         //
-        // Categoria (ajuste posterior, sobre la hoja de ejemplo real "J.LUCUMI" del mismo
-        // archivo): las competencias se agrupan en dos macro-grupos de 50% cada uno —
-        // "EVALUACION DE COMPETENCIAS ORGANIZACIONALES" (Constantes.CategoriaOrganizacional) y
-        // "EVALUACION DE COMPETENCIAS DE ROL" (Constantes.CategoriaDeRol). En esa hoja de
-        // ejemplo, "Trabajo en equipo" para el Conductor está SOLO en el grupo "de Rol" (con
-        // comportamientos propios de coordinación con el equipo de despachos), no en el grupo
-        // organizacional — por eso el Conductor tiene su propia competencia "Trabajo en equipo"
-        // (más abajo), distinta de la genérica que sigue aplicando igual al resto de tipos de
-        // personal. Ver AsignacionService.GenerarFormulariosAsync para cómo se calcula el peso.
-        db.Competencias.AddRange(
-            // -- Organizacionales (aplican a todos los tipos de personal) --
-            new Competencia
-            {
-                Nombre = "Adherencia a normas y políticas organizacionales",
-                Descripcion = "Capacidad para adaptarse a las normas y políticas de la organización, mostrando compromiso al conocerlas, entenderlas y aplicarlas.",
-                IdTipoPersonal = null,
-                Categoria = Constantes.CategoriaOrganizacional,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Compromiso con la calidad del trabajo",
-                Descripcion = "Capacidad para actuar con minuciosidad, velocidad y sentido de urgencia y tomar decisiones para alcanzar los objetivos del puesto de trabajo, del área u organizacionales, con altos niveles de desempeño.",
-                IdTipoPersonal = null,
-                Categoria = Constantes.CategoriaOrganizacional,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Trabajo en equipo",
-                Descripcion = "Habilidad para interactuar con las personas, escuchar activamente y ser generador de ideas que faciliten la obtención de resultados exitosos, enmarcados en el beneficio común, por encima de los intereses personales.",
-                IdTipoPersonal = null,
-                Categoria = Constantes.CategoriaOrganizacional,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Eficiencia y productividad",
-                Descripcion = "Habilidad para dirigir las propias acciones y/o las de otros de forma que agreguen valor a la organización, alcanzando los objetivos, cumpliendo con el tiempo disponible y con la calidad requerida.",
-                IdTipoPersonal = null,
-                Categoria = Constantes.CategoriaOrganizacional,
-                Activa = true,
-            },
-            // -- Específicas por tipo de personal --
-            new Competencia
-            {
-                Nombre = "Visión estratégica",
-                Descripcion = "Capacidad para definir el rumbo de la organización a mediano y largo plazo, anticipando cambios del entorno y alineando los recursos disponibles.",
-                IdTipoPersonal = directivo.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Liderazgo de equipos",
-                Descripcion = "Capacidad para dirigir, motivar y desarrollar al equipo a cargo, garantizando el cumplimiento de los objetivos del área.",
-                IdTipoPersonal = mandoMedio.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Precisión en el manejo de información",
-                Descripcion = "Capacidad para procesar y registrar información administrativa con exactitud, evitando errores que afecten los procesos internos.",
-                IdTipoPersonal = administrativo.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Calidad en el proceso productivo",
-                Descripcion = "Capacidad para ejecutar el proceso productivo cumpliendo los estándares de calidad y minimizando unidades defectuosas.",
-                IdTipoPersonal = operario.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Cumplimiento de normas de seguridad",
-                Descripcion = "Capacidad para aplicar de forma consistente las normas de seguridad industrial y el uso adecuado de los elementos de protección personal.",
-                IdTipoPersonal = auxiliarPlanta.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            // -- Competencias de rol del Conductor (de la sección "COMPETENCIAS DE ROL" del
-            //    formato GHU-FOR-007, adaptadas al rol de despachos/transporte) --
-            new Competencia
-            {
-                Nombre = "Orientación al cliente",
-                Descripcion = "Capacidad de generar valor agregado y diferenciador a los clientes internos y externos, indagando, conociendo y resolviendo oportunamente sus necesidades.",
-                IdTipoPersonal = conductor.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Trabajo en equipo",
-                Descripcion = "Habilidad para interactuar con las personas, escuchar activamente y ser generador de ideas que faciliten resultados exitosos, coordinando con el coordinador y el auxiliar de despachos las actividades de cargue y recogida, por encima de los intereses individuales.",
-                IdTipoPersonal = conductor.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Orientación al logro",
-                Descripcion = "Gran capacidad para el seguimiento y velocidad en la consecución de los objetivos propuestos, con facilidad y oportunidad para la toma de decisiones que favorezcan a toda la organización.",
-                IdTipoPersonal = conductor.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Atención al detalle",
-                Descripcion = "Manejo eficaz y prolongado de información detallada, procurando eliminar el error y las duplicidades en el proceso de despacho y entrega.",
-                IdTipoPersonal = conductor.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Sentido de la urgencia",
-                Descripcion = "Capacidad para percibir la urgencia real de determinadas tareas y actuar con celeridad para alcanzar su realización en plazos breves de tiempo.",
-                IdTipoPersonal = conductor.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            },
-            new Competencia
-            {
-                Nombre = "Escucha activa",
-                Descripcion = "Escucha activa de las instrucciones recibidas, preguntando hasta que los mensajes estén totalmente claros, y estando alerta a los cambios de la operación.",
-                IdTipoPersonal = conductor.IdTipoPersonal,
-                Categoria = Constantes.CategoriaDeRol,
-                Activa = true,
-            });
+        // La "NOTA FINAL" de cada competencia (RespuestaDetalle.Calificacion) es el promedio de
+        // sus comportamientos ya calificados — calculado en el servidor a partir de
+        // RespuestaComportamientoDetalle, nunca a partir de un total posteado directamente (ver
+        // Comportamiento.cs y EvaluacionesController.Guardar). Categoria sigue igual que antes:
+        // "Organizacional" (20% del total) y "DeRol" (30% del total) — ver Constantes.
+        var compAdherencia = new Competencia
+        {
+            Nombre = "Adherencia a normas y políticas organizacionales",
+            Descripcion = "Capacidad para adaptarse a las normas y políticas de la organización, mostrando compromiso al conocerlas, entenderlas y aplicarlas.",
+            IdTipoPersonal = null,
+            Categoria = Constantes.CategoriaOrganizacional,
+            Activa = true,
+        };
+        var compCalidadTrabajo = new Competencia
+        {
+            Nombre = "Compromiso con la calidad de trabajo",
+            Descripcion = "Capacidad para actuar con minuciosidad, velocidad y sentido de urgencia y tomar decisiones para alcanzar los objetivos de su puesto de trabajo, del área, u organizacionales, con altos niveles de desempeño.",
+            IdTipoPersonal = null,
+            Categoria = Constantes.CategoriaOrganizacional,
+            Activa = true,
+        };
+        var compEficienciaProductividad = new Competencia
+        {
+            Nombre = "Eficiencia y Productividad",
+            Descripcion = "Habilidad para dirigir las propias acciones y/o las de otros de forma que agreguen valor a la organización, alcanzando los objetivos, cumpliendo con el tiempo disponible y con la calidad requerida.",
+            IdTipoPersonal = null,
+            Categoria = Constantes.CategoriaOrganizacional,
+            Activa = true,
+        };
+        var compAtencionDetalle = new Competencia
+        {
+            Nombre = "Atención al detalle",
+            Descripcion = "Capacidad para identificar, evaluar y controlar los detalles que comprende una acción o actividad, verificando la calidad y el procedimiento, para evitar afectaciones en la gestión.",
+            IdTipoPersonal = null,
+            Categoria = Constantes.CategoriaDeRol,
+            Activa = true,
+        };
+        var compCalidadDeRol = new Competencia
+        {
+            Nombre = "Calidad de trabajo",
+            Descripcion = "Capacidad para determinar eficazmente las metas y prioridades de su tarea/área/proyecto estipulando la acción, los plazos y los recursos requeridos.",
+            IdTipoPersonal = null,
+            Categoria = Constantes.CategoriaDeRol,
+            Activa = true,
+        };
+        var compPlanificacionSeguimiento = new Competencia
+        {
+            Nombre = "Planificación y seguimiento",
+            Descripcion = "Es la capacidad de identificar y determinar de forma efectiva sus prioridades estableciendo fechas, actividades y responsables.",
+            IdTipoPersonal = null,
+            Categoria = Constantes.CategoriaDeRol,
+            Activa = true,
+        };
+
+        db.Competencias.AddRange(compAdherencia, compCalidadTrabajo, compEficienciaProductividad,
+            compAtencionDetalle, compCalidadDeRol, compPlanificacionSeguimiento);
+        await db.SaveChangesAsync(); // asigna IdCompetencia para poder enlazar comportamientos
+
+        db.Comportamientos.AddRange(
+            // -- Adherencia a normas y políticas organizacionales (6 comportamientos) --
+            NuevoComportamiento(compAdherencia, 1, "Cumple con las normas y procedimientos establecidos por la compañía."),
+            NuevoComportamiento(compAdherencia, 2, "Utiliza los elementos de protección personal."),
+            NuevoComportamiento(compAdherencia, 3, "Porta el uniforme adecuadamente, conforme a las políticas de la compañía."),
+            NuevoComportamiento(compAdherencia, 4, "Se dirige con respeto frente a su jefe y compañeros."),
+            NuevoComportamiento(compAdherencia, 5, "Cuenta con disposición para el trabajo adicional cuando la compañía lo requiere."),
+            NuevoComportamiento(compAdherencia, 6, "Cumple con los horarios establecidos para su turno de trabajo."),
+            // -- Compromiso con la calidad de trabajo (3 comportamientos) --
+            NuevoComportamiento(compCalidadTrabajo, 1, "Utiliza métodos estructurados para definir las actividades necesarias durante el proceso, para lograr el resultado esperado (producto)."),
+            NuevoComportamiento(compCalidadTrabajo, 2, "Evalúa los posibles riesgos, consecuencias e impactos negativos que se pueden obtener como consecuencia de la falta de control de proceso."),
+            NuevoComportamiento(compCalidadTrabajo, 3, "Toma decisiones y emprende acciones de mejora en base al análisis de los resultados obtenidos."),
+            // -- Eficiencia y Productividad (3 comportamientos) --
+            NuevoComportamiento(compEficienciaProductividad, 1, "Mantiene un buen nivel de actividad, variando su ritmo en función del tiempo disponible y realizando su trabajo según los tiempos establecidos."),
+            NuevoComportamiento(compEficienciaProductividad, 2, "Se esfuerza por aumentar el volumen de trabajo realizado, sin descuidar la calidad."),
+            NuevoComportamiento(compEficienciaProductividad, 3, "Comprueba que la calidad y los beneficios obtenidos de su trabajo son los esperados."),
+            // -- Atención al detalle (5 comportamientos) --
+            NuevoComportamiento(compAtencionDetalle, 1, "Lee e interpreta la orden de producción."),
+            NuevoComportamiento(compAtencionDetalle, 2, "Realiza un adecuado despeje de línea al iniciar la inspección de cada producto."),
+            NuevoComportamiento(compAtencionDetalle, 3, "Empaca los productos conforme a las especificaciones de la orden de producción o manual de empaque."),
+            NuevoComportamiento(compAtencionDetalle, 4, "Realiza el control de cierre al finalizar la revisión de la orden de producción."),
+            NuevoComportamiento(compAtencionDetalle, 5, "Evita mezclas de producto en todas las referencias procesadas."),
+            // -- Calidad de trabajo (1 comportamiento) --
+            NuevoComportamiento(compCalidadDeRol, 1, "Informa las no conformidades observadas durante la realización de procesos de inspección."),
+            // -- Planificación y seguimiento (2 comportamientos) --
+            NuevoComportamiento(compPlanificacionSeguimiento, 1, "Marca las fajillas y paquetes con el número que le corresponde."),
+            NuevoComportamiento(compPlanificacionSeguimiento, 2, "Revisa y segrega eficientemente cada producto inspeccionado, ya sea lateral y AUT, en mesa o plano."));
         await db.SaveChangesAsync();
 
         // ---- Indicadores de gestión (Entregable 11) ----
         // Tomados, con su nombre, fórmula y ponderación, del formato real de Alianzagrafica
         // "EVALUACION DESEMPEÑO Indicadores" (macro-grupo "INDICADORES DE GESTIÓN", 50% de la
         // nota final). Son genéricos (IdTipoPersonal = null): aplican a los seis tipos de
-        // personal, igual que las 4 competencias organizacionales. No se copió ningún dato de
+        // personal, igual que las 3 competencias organizacionales (Entregable 13). No se copió ningún dato de
         // persona real de ese archivo — la Meta/Resultado del mes de cada indicador la
         // diligencia cada evaluador, no viene precargada en la siembra.
         //
@@ -343,6 +298,15 @@ public static class DemoSeed
         Estado = Constantes.EstadoEmpleadoActivo,
         FechaIngreso = hoy,
         FechaSincronizacion = ahora,
+    };
+
+    /// <summary>Comportamiento de una competencia (Entregable 13) — ver Comportamiento.cs.</summary>
+    private static Comportamiento NuevoComportamiento(Competencia competencia, int orden, string descripcion) => new()
+    {
+        IdCompetencia = competencia.IdCompetencia,
+        Orden = orden,
+        Descripcion = descripcion,
+        Activo = true,
     };
 
     private static Usuario NuevoUsuarioDemo(Empleado empleado, DateTime ahora) => new()

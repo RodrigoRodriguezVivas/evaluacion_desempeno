@@ -17,6 +17,11 @@ public class RespuestaEvaluacion
     public AsignacionEvaluacion Asignacion { get; set; } = null!;
     public ICollection<RespuestaDetalle> Detalles { get; set; } = new List<RespuestaDetalle>();
     public ICollection<RespuestaIndicadorDetalle> DetallesIndicadores { get; set; } = new List<RespuestaIndicadorDetalle>();
+
+    /// <summary>Calificaciones individuales por comportamiento (Entregable 13) — ver
+    /// <see cref="RespuestaComportamientoDetalle"/>. <see cref="RespuestaDetalle.Calificacion"/>
+    /// de la competencia correspondiente es el promedio de estas.</summary>
+    public ICollection<RespuestaComportamientoDetalle> DetallesComportamientos { get; set; } = new List<RespuestaComportamientoDetalle>();
 }
 
 public class RespuestaDetalle
@@ -24,14 +29,36 @@ public class RespuestaDetalle
     public int IdRespuesta { get; set; }
     public int IdCompetencia { get; set; }
 
-    /// <summary>Calificación del evaluador, en puntos porcentuales, 0-100 (Entregable 12 — antes
-    /// era una escala de 1 a 5; ver <see cref="Entidades.EscalaCalificacion"/> para la
-    /// clasificación cualitativa Deficiente/Aceptable/Bueno/Sobresaliente equivalente).</summary>
+    /// <summary>Calificación de la competencia, en puntos porcentuales, 0-100. Desde el
+    /// Entregable 13 este valor YA NO lo escribe directamente el evaluador: es el promedio de
+    /// las calificaciones individuales de los <see cref="Comportamiento">comportamientos</see> de
+    /// la competencia (columna "NOTA FINAL" = AVERAGE(...) en el Excel origen
+    /// "EVALUACION DESEMPEÑO_Evaluaciones"), calculado en el servidor a partir de
+    /// <see cref="RespuestaComportamientoDetalle"/> — ver EvaluacionesController.Guardar. Antes
+    /// del Entregable 13 era un valor calificado directamente aquí; antes del Entregable 12 era
+    /// una escala de 1 a 5. Ver <see cref="Entidades.EscalaCalificacion"/> para la clasificación
+    /// cualitativa Deficiente/Aceptable/Bueno/Sobresaliente equivalente.</summary>
     public decimal Calificacion { get; set; }
     public string? Comentario { get; set; }
 
     public RespuestaEvaluacion Respuesta { get; set; } = null!;
     public Competencia Competencia { get; set; } = null!;
+}
+
+/// <summary>Calificación del evaluador para un comportamiento individual dentro de una
+/// competencia (Entregable 13 — columna "NOTA INDIVIDUAL" del Excel origen
+/// "EVALUACION DESEMPEÑO_Evaluaciones"). El promedio de estas filas, agrupadas por competencia,
+/// es <see cref="RespuestaDetalle.Calificacion"/> (columna "NOTA FINAL" del Excel).</summary>
+public class RespuestaComportamientoDetalle
+{
+    public int IdRespuesta { get; set; }
+    public int IdComportamiento { get; set; }
+
+    /// <summary>Calificación en puntos porcentuales, 0-100.</summary>
+    public decimal Calificacion { get; set; }
+
+    public RespuestaEvaluacion Respuesta { get; set; } = null!;
+    public Comportamiento Comportamiento { get; set; } = null!;
 }
 
 /// <summary>Respuesta de un indicador de gestión dentro de una evaluación (Entregable 11),

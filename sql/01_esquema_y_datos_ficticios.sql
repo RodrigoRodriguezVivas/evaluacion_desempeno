@@ -127,6 +127,24 @@ CREATE TABLE dbo.Competencia (
 );
 GO
 
+-- ---- Comportamientos observables de cada competencia (Entregable 13 — columna
+-- "COMPORTAMIENTOS" del formato real "EVALUACION DESEMPEÑO_Evaluaciones" de Alianzagrafica). El
+-- evaluador califica cada comportamiento individualmente en % (0-100); dbo.RespuestaDetalle.
+-- Calificacion (la "NOTA FINAL" de la competencia) es el promedio simple de los comportamientos
+-- respondidos de esa competencia — ver dbo.RespuestaComportamientoDetalle más abajo. El promedio
+-- se calcula en el servidor (EvaluacionesController.Guardar en la aplicación), nunca a partir de
+-- un valor que venga directamente del formulario posteado.
+CREATE TABLE dbo.Comportamiento (
+    IdComportamiento INT IDENTITY(1,1)  NOT NULL,
+    IdCompetencia    INT                NOT NULL,
+    Descripcion      NVARCHAR(400)      NOT NULL,
+    Orden            INT                NOT NULL CONSTRAINT DF_Comportamiento_Orden DEFAULT (0),
+    Activo           BIT                NOT NULL CONSTRAINT DF_Comportamiento_Activo DEFAULT (1),
+    CONSTRAINT PK_Comportamiento PRIMARY KEY (IdComportamiento),
+    CONSTRAINT FK_Comportamiento_Competencia FOREIGN KEY (IdCompetencia) REFERENCES dbo.Competencia (IdCompetencia)
+);
+GO
+
 -- ---- Indicadores de gestión (Entregable 11 — macro-grupo "Indicadores de Gestión", formato
 -- real "EVALUACION DESEMPEÑO Indicadores" de Alianzagrafica). Un indicador se mide con una Meta
 -- y un Resultado del mes, ambos en puntos porcentuales — ver dbo.RespuestaIndicadorDetalle más
@@ -250,6 +268,21 @@ CREATE TABLE dbo.RespuestaDetalle (
     CONSTRAINT FK_Detalle_Respuesta FOREIGN KEY (IdRespuesta) REFERENCES dbo.RespuestaEvaluacion (IdRespuesta),
     CONSTRAINT FK_Detalle_Competencia FOREIGN KEY (IdCompetencia) REFERENCES dbo.Competencia (IdCompetencia),
     CONSTRAINT CK_Detalle_Calificacion CHECK (Calificacion BETWEEN 0 AND 100)
+);
+GO
+
+-- Entregable 13: calificación del evaluador para un comportamiento individual (columna "NOTA
+-- INDIVIDUAL" del Excel origen "EVALUACION DESEMPEÑO_Evaluaciones"). El promedio de estas filas,
+-- agrupadas por competencia, es dbo.RespuestaDetalle.Calificacion (columna "NOTA FINAL" del
+-- Excel, fórmula =AVERAGE(...) por competencia).
+CREATE TABLE dbo.RespuestaComportamientoDetalle (
+    IdRespuesta      INT           NOT NULL,
+    IdComportamiento INT           NOT NULL,
+    Calificacion     DECIMAL(5,2)  NOT NULL,
+    CONSTRAINT PK_RespuestaComportamientoDetalle PRIMARY KEY (IdRespuesta, IdComportamiento),
+    CONSTRAINT FK_DetalleComp_Respuesta FOREIGN KEY (IdRespuesta) REFERENCES dbo.RespuestaEvaluacion (IdRespuesta),
+    CONSTRAINT FK_DetalleComp_Comportamiento FOREIGN KEY (IdComportamiento) REFERENCES dbo.Comportamiento (IdComportamiento),
+    CONSTRAINT CK_DetalleComp_Calificacion CHECK (Calificacion BETWEEN 0 AND 100)
 );
 GO
 
@@ -463,63 +496,79 @@ WHERE u.CodigoEmpleado = 1001;
 GO
 
 -- =========================================================
--- 5. COMPETENCIAS (propuesta inicial — sección 5.2 del documento)
+-- 5. COMPETENCIAS Y COMPORTAMIENTOS (Entregable 13)
 -- =========================================================
 
--- Genéricas (IdTipoPersonal = NULL, aplican a todo el personal). Categoria = 'Organizacional'
--- (RF-07 — macro-grupo "EVALUACION DE COMPETENCIAS ORGANIZACIONALES", peso 20% del total desde
--- el Entregable 11 —antes 50%—, según el formato real GHU-FOR-007 / "EVALUACION DESEMPEÑO
--- Indicadores" de Alianzagrafica — ver Entregable 5 y los ajustes posteriores de
--- agrupación/ponderación).
-INSERT INTO dbo.Competencia (Nombre, IdTipoPersonal, Categoria) VALUES
-    (N'Compromiso y responsabilidad', NULL, N'Organizacional'),
-    (N'Trabajo en equipo', NULL, N'Organizacional'),
-    (N'Comunicación', NULL, N'Organizacional'),
-    (N'Adaptación al cambio', NULL, N'Organizacional'),
-    (N'Cumplimiento de normas de seguridad industrial y calidad', NULL, N'Organizacional');
+-- Reemplaza el catálogo anterior (competencias específicas por tipo de personal — "Visión
+-- estratégica" del Directivo, "Liderazgo de equipos" del Mando medio, las 6 del Conductor, etc.)
+-- por el del formato real "EVALUACION DESEMPEÑO_Evaluaciones" de Alianzagrafica (Excel
+-- adjuntado por el usuario), que desglosa cada competencia en sus comportamientos observables
+-- (columna "COMPORTAMIENTOS"). A pedido explícito del usuario ("mismo listado para todos los
+-- perfiles"), es un catálogo ÚNICO y genérico (IdTipoPersonal = NULL): las mismas 6 competencias
+-- (3 'Organizacional' + 3 'DeRol') y sus 20 comportamientos aplican igual a los seis tipos de
+-- personal. Categoria conserva el mismo significado que antes: 'Organizacional' (macro-grupo
+-- "EVALUACION DE COMPETENCIAS ORGANIZACIONALES", 20% del total) y 'DeRol' (macro-grupo
+-- "EVALUACION DE COMPETENCIAS DE ROL", 30% del total) — ver sección 6 y Constantes.cs.
+--
+-- La "NOTA FINAL" de cada competencia (dbo.RespuestaDetalle.Calificacion) es el promedio de sus
+-- comportamientos ya calificados — se calcula en el servidor (nunca a partir de un total posteado
+-- directamente) al guardar dbo.RespuestaComportamientoDetalle — ver sección 8 más abajo para un
+-- ejemplo end-to-end.
+INSERT INTO dbo.Competencia (Nombre, Descripcion, IdTipoPersonal, Categoria) VALUES
+    (N'Adherencia a normas y políticas organizacionales',
+     N'Capacidad para adaptarse a las normas y políticas de la organización, mostrando compromiso al conocerlas, entenderlas y aplicarlas.',
+     NULL, N'Organizacional'),
+    (N'Compromiso con la calidad de trabajo',
+     N'Capacidad para actuar con minuciosidad, velocidad y sentido de urgencia y tomar decisiones para alcanzar los objetivos de su puesto de trabajo, del área, u organizacionales, con altos niveles de desempeño.',
+     NULL, N'Organizacional'),
+    (N'Eficiencia y Productividad',
+     N'Habilidad para dirigir las propias acciones y/o las de otros de forma que agreguen valor a la organización, alcanzando los objetivos, cumpliendo con el tiempo disponible y con la calidad requerida.',
+     NULL, N'Organizacional'),
+    (N'Atención al detalle',
+     N'Capacidad para identificar, evaluar y controlar los detalles que comprende una acción o actividad, verificando la calidad y el procedimiento, para evitar afectaciones en la gestión.',
+     NULL, N'DeRol'),
+    (N'Calidad de trabajo',
+     N'Capacidad para determinar eficazmente las metas y prioridades de su tarea/área/proyecto estipulando la acción, los plazos y los recursos requeridos.',
+     NULL, N'DeRol'),
+    (N'Planificación y seguimiento',
+     N'Es la capacidad de identificar y determinar de forma efectiva sus prioridades estableciendo fechas, actividades y responsables.',
+     NULL, N'DeRol');
 GO
 
--- Específicas por tipo de personal. Categoria = 'DeRol' (macro-grupo "EVALUACION DE
--- COMPETENCIAS DE ROL", peso 30% del total desde el Entregable 11 —antes 50%—).
-INSERT INTO dbo.Competencia (Nombre, IdTipoPersonal, Categoria)
-SELECT N'Liderazgo y desarrollo de personas', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
-UNION ALL SELECT N'Visión estratégica', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
-UNION ALL SELECT N'Toma de decisiones', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
-UNION ALL SELECT N'Gestión del cambio', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
-UNION ALL SELECT N'Orientación a resultados', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Directivo'
-
-UNION ALL SELECT N'Liderazgo de equipos', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
-UNION ALL SELECT N'Planificación y organización', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
-UNION ALL SELECT N'Resolución de problemas', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
-UNION ALL SELECT N'Gestión de indicadores de área', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Mando medio'
-
-UNION ALL SELECT N'Orientación al servicio interno', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
-UNION ALL SELECT N'Precisión y manejo de detalle', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
-UNION ALL SELECT N'Manejo de herramientas ofimáticas/ERP', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
-UNION ALL SELECT N'Gestión del tiempo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Administrativo'
-
-UNION ALL SELECT N'Calidad y precisión en el proceso productivo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
-UNION ALL SELECT N'Manejo de maquinaria y equipos', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
-UNION ALL SELECT N'Cumplimiento de estándares de producción', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
-UNION ALL SELECT N'Seguridad y orden en el puesto de trabajo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Operario'
-
-UNION ALL SELECT N'Disposición y colaboración', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
-UNION ALL SELECT N'Cumplimiento de instrucciones', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
-UNION ALL SELECT N'Orden y aseo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
-UNION ALL SELECT N'Seguridad industrial', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Auxiliar de planta'
-
--- Conductor — competencias de rol tomadas del formato real GHU-FOR-007 de Alianzagrafica,
--- sección "COMPETENCIAS DE ROL" (mismo enriquecimiento aplicado en la demo — ver Entregable 5).
--- "Trabajo en equipo" tiene aquí su propia versión específica del Conductor, con comportamientos
--- de coordinación con el equipo de despachos, DISTINTA de la genérica "Organizacional" de arriba
--- — la consulta de ponderación de la sección 6 hace que la específica reemplace a la genérica
--- del mismo nombre para este tipo de personal, igual que en AsignacionService (aplicación).
-UNION ALL SELECT N'Orientación al cliente', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
-UNION ALL SELECT N'Trabajo en equipo', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
-UNION ALL SELECT N'Orientación al logro', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
-UNION ALL SELECT N'Atención al detalle', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
-UNION ALL SELECT N'Sentido de la urgencia', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor'
-UNION ALL SELECT N'Escucha activa', IdTipoPersonal, N'DeRol' FROM dbo.TipoPersonal WHERE Nombre = N'Conductor';
+-- Comportamientos observables de cada competencia (columna "COMPORTAMIENTOS" del Excel origen),
+-- en el mismo orden en que aparecen sus filas. 20 comportamientos en total: 12 en el grupo
+-- Organizacional (6+3+3) y 8 en el grupo DeRol (5+1+2).
+INSERT INTO dbo.Comportamiento (IdCompetencia, Descripcion, Orden)
+SELECT c.IdCompetencia, v.Descripcion, v.Orden
+FROM (VALUES
+    -- Adherencia a normas y políticas organizacionales
+    (N'Adherencia a normas y políticas organizacionales', 1, N'Cumple con las normas y procedimientos establecidos por la compañía.'),
+    (N'Adherencia a normas y políticas organizacionales', 2, N'Utiliza los elementos de protección personal.'),
+    (N'Adherencia a normas y políticas organizacionales', 3, N'Porta el uniforme adecuadamente, conforme a las políticas de la compañía.'),
+    (N'Adherencia a normas y políticas organizacionales', 4, N'Se dirige con respeto frente a su jefe y compañeros.'),
+    (N'Adherencia a normas y políticas organizacionales', 5, N'Cuenta con disposición para el trabajo adicional cuando la compañía lo requiere.'),
+    (N'Adherencia a normas y políticas organizacionales', 6, N'Cumple con los horarios establecidos para su turno de trabajo.'),
+    -- Compromiso con la calidad de trabajo
+    (N'Compromiso con la calidad de trabajo', 1, N'Utiliza métodos estructurados para definir las actividades necesarias durante el proceso, para lograr el resultado esperado (producto).'),
+    (N'Compromiso con la calidad de trabajo', 2, N'Evalúa los posibles riesgos, consecuencias e impactos negativos que se pueden obtener como consecuencia de la falta de control de proceso.'),
+    (N'Compromiso con la calidad de trabajo', 3, N'Toma decisiones y emprende acciones de mejora en base al análisis de los resultados obtenidos.'),
+    -- Eficiencia y Productividad
+    (N'Eficiencia y Productividad', 1, N'Mantiene un buen nivel de actividad, variando su ritmo en función del tiempo disponible y realizando su trabajo según los tiempos establecidos.'),
+    (N'Eficiencia y Productividad', 2, N'Se esfuerza por aumentar el volumen de trabajo realizado, sin descuidar la calidad.'),
+    (N'Eficiencia y Productividad', 3, N'Comprueba que la calidad y los beneficios obtenidos de su trabajo son los esperados.'),
+    -- Atención al detalle
+    (N'Atención al detalle', 1, N'Lee e interpreta la orden de producción.'),
+    (N'Atención al detalle', 2, N'Realiza un adecuado despeje de línea al iniciar la inspección de cada producto.'),
+    (N'Atención al detalle', 3, N'Empaca los productos conforme a las especificaciones de la orden de producción o manual de empaque.'),
+    (N'Atención al detalle', 4, N'Realiza el control de cierre al finalizar la revisión de la orden de producción.'),
+    (N'Atención al detalle', 5, N'Evita mezclas de producto en todas las referencias procesadas.'),
+    -- Calidad de trabajo (grupo DeRol)
+    (N'Calidad de trabajo', 1, N'Informa las no conformidades observadas durante la realización de procesos de inspección.'),
+    -- Planificación y seguimiento
+    (N'Planificación y seguimiento', 1, N'Marca las fajillas y paquetes con el número que le corresponde.'),
+    (N'Planificación y seguimiento', 2, N'Revisa y segrega eficientemente cada producto inspeccionado, ya sea lateral y AUT, en mesa o plano.')
+) AS v(CompetenciaNombre, Orden, Descripcion)
+JOIN dbo.Competencia c ON c.Nombre = v.CompetenciaNombre AND c.IdTipoPersonal IS NULL;
 GO
 
 -- Indicadores de gestión (Entregable 11 — macro-grupo "INDICADORES DE GESTIÓN", peso 50% del
@@ -777,9 +826,22 @@ DECLARE @IdFormJefeOperario INT = (
 
 -- Autoevaluación: Wilson se califica con 85% en todas sus competencias (Entregable 12 — escala
 -- nativa 0-100%, ya no 1-5; 85% cae en la banda "Bueno" de EscalaCalificacion).
+--
+-- Entregable 13 — comportamientos: por simplicidad del ejemplo, se califica CADA comportamiento
+-- de cada competencia con el mismo valor (85.00 aquí, 60.00 más abajo para el jefe), en vez de
+-- variar comportamiento por comportamiento — así el promedio por competencia (=AVERAGE(...), lo
+-- que en la aplicación calcula el servidor al guardar) da exactamente 85.00/60.00, reproduciendo
+-- el mismo resultado que ya estaba verificado con el harness offline antes de agregar la capa de
+-- comportamientos (ver Entregable 12), sin tener que recalcular el caso de ejemplo a mano.
 INSERT INTO dbo.RespuestaDetalle (IdRespuesta, IdCompetencia, Calificacion, Comentario)
 SELECT @IdRespAuto, fc.IdCompetencia, 85.00, N'Autoevaluación — ejemplo de datos ficticios'
 FROM dbo.FormularioCompetencia fc
+WHERE fc.IdFormulario = @IdFormAutoOperario;
+
+INSERT INTO dbo.RespuestaComportamientoDetalle (IdRespuesta, IdComportamiento, Calificacion)
+SELECT @IdRespAuto, co.IdComportamiento, 85.00
+FROM dbo.FormularioCompetencia fc
+JOIN dbo.Comportamiento co ON co.IdCompetencia = fc.IdCompetencia
 WHERE fc.IdFormulario = @IdFormAutoOperario;
 
 -- Evaluación del jefe: Laura califica a Wilson con 60% en todas sus competencias. Nota: el
@@ -790,6 +852,12 @@ WHERE fc.IdFormulario = @IdFormAutoOperario;
 INSERT INTO dbo.RespuestaDetalle (IdRespuesta, IdCompetencia, Calificacion, Comentario)
 SELECT @IdRespJefe, fc.IdCompetencia, 60.00, N'Evaluación del jefe — ejemplo de datos ficticios'
 FROM dbo.FormularioCompetencia fc
+WHERE fc.IdFormulario = @IdFormJefeOperario;
+
+INSERT INTO dbo.RespuestaComportamientoDetalle (IdRespuesta, IdComportamiento, Calificacion)
+SELECT @IdRespJefe, co.IdComportamiento, 60.00
+FROM dbo.FormularioCompetencia fc
+JOIN dbo.Comportamiento co ON co.IdCompetencia = fc.IdCompetencia
 WHERE fc.IdFormulario = @IdFormJefeOperario;
 
 -- Indicadores de gestión (Entregable 11) — Meta y Resultado del mes son datos operativos
@@ -901,6 +969,7 @@ UNION ALL SELECT 'Rol', COUNT(*) FROM dbo.Rol
 UNION ALL SELECT 'Usuario', COUNT(*) FROM dbo.Usuario
 UNION ALL SELECT 'UsuarioRol', COUNT(*) FROM dbo.UsuarioRol
 UNION ALL SELECT 'Competencia', COUNT(*) FROM dbo.Competencia
+UNION ALL SELECT 'Comportamiento', COUNT(*) FROM dbo.Comportamiento
 UNION ALL SELECT 'IndicadorGestion', COUNT(*) FROM dbo.IndicadorGestion
 UNION ALL SELECT 'PeriodoEvaluacion', COUNT(*) FROM dbo.PeriodoEvaluacion
 UNION ALL SELECT 'FormularioEvaluacion', COUNT(*) FROM dbo.FormularioEvaluacion
@@ -909,6 +978,7 @@ UNION ALL SELECT 'FormularioIndicador', COUNT(*) FROM dbo.FormularioIndicador
 UNION ALL SELECT 'AsignacionEvaluacion', COUNT(*) FROM dbo.AsignacionEvaluacion
 UNION ALL SELECT 'RespuestaEvaluacion', COUNT(*) FROM dbo.RespuestaEvaluacion
 UNION ALL SELECT 'RespuestaDetalle', COUNT(*) FROM dbo.RespuestaDetalle
+UNION ALL SELECT 'RespuestaComportamientoDetalle', COUNT(*) FROM dbo.RespuestaComportamientoDetalle
 UNION ALL SELECT 'RespuestaIndicadorDetalle', COUNT(*) FROM dbo.RespuestaIndicadorDetalle
 UNION ALL SELECT 'ResultadoConsolidado', COUNT(*) FROM dbo.ResultadoConsolidado
 UNION ALL SELECT 'ContactoNotificacion', COUNT(*) FROM dbo.ContactoNotificacion

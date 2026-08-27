@@ -27,6 +27,19 @@ public class MisEvaluacionesViewModel
     public List<AsignacionResumenViewModel> Completadas { get; set; } = new();
 }
 
+/// <summary>Ítem de un comportamiento individual dentro de una competencia (Entregable 13 —
+/// columna "COMPORTAMIENTOS" del Excel origen "EVALUACION DESEMPEÑO_Evaluaciones"). El evaluador
+/// califica cada comportamiento por separado; ver <see cref="ItemCompetenciaViewModel.Calificacion"/>
+/// para cómo se combinan.</summary>
+public class ItemComportamientoViewModel
+{
+    public int IdComportamiento { get; set; }
+    public string Descripcion { get; set; } = string.Empty;
+
+    [Range(0, 100, ErrorMessage = "La calificación debe estar entre 0% y 100%.")]
+    public decimal? Calificacion { get; set; }
+}
+
 public class ItemCompetenciaViewModel
 {
     public int IdCompetencia { get; set; }
@@ -35,7 +48,16 @@ public class ItemCompetenciaViewModel
     public string? Categoria { get; set; }
     public decimal Ponderacion { get; set; }
 
-    [Range(0, 100, ErrorMessage = "La calificación debe estar entre 0% y 100%.")]
+    /// <summary>Comportamientos observables de esta competencia (Entregable 13). El evaluador
+    /// califica cada uno; esta lista siempre viene poblada desde el catálogo
+    /// (<see cref="Entidades.Comportamiento"/>) al mostrar el formulario.</summary>
+    public List<ItemComportamientoViewModel> Comportamientos { get; set; } = new();
+
+    /// <summary>"NOTA FINAL" de la competencia: el promedio de <see cref="Comportamientos"/> que
+    /// el evaluador ya calificó. Desde el Entregable 13 este valor NO se diligencia directamente
+    /// (no hay un &lt;input&gt; que lo edite) — se calcula en el servidor a partir de los
+    /// comportamientos posteados (EvaluacionesController.Guardar) y aquí solo se usa para
+    /// mostrarlo/recalcular subtotales, igual que antes.</summary>
     public decimal? Calificacion { get; set; }
 
     [StringLength(500)]
